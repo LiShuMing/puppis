@@ -132,6 +132,20 @@ Agent **不**持有平台 token；不读桶。
 
 **明确不做：** 双语言栈、Mem0 fork、L0 上向量主路径、Serve 直调平台 API。
 
+
+## 6.2 开源候选与评测门槛（可换 Lake 内核）
+
+原则：**契约自有、内核可换**。OSS raw + `item_id` / MCP `search|get|pack`  equip；评测达标则适配进 Lake，不达标再自研薄层。
+
+| 候选 | 评什么 | 过线门槛（L0 后） |
+|---|---|---|
+| mnemon / local-memory-mcp 等 FTS MCP | 延迟、许可（MIT 优先）、能否只作检索后端 | p95 search <200ms @1万条；可剥离其「记忆写入」叙事 |
+| sqlite-vec / pgvector | 召回@10 vs 纯 FTS | 相对 FTS 有可测增益再上；L0 不挡 |
+| AgentsView（只读） | session 源 connector，非 Lake 核 | 能 `pull(since)` 进 raw；不当第一手事实 |
+| 抽取/Pack 库 | 是否绑死模型供应商 | 必须可换模型；输出挂 `item_id` |
+
+评测集：本人近 14 天 Notion|日历（+可选假 GitHub）固定 query 20 条；记录命中、漏报、延迟、许可证。L0 狗粮不等人；评测并行。
+
 ## 7. 仓内目录
 
 ```
