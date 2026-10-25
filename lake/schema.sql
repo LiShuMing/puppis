@@ -35,3 +35,17 @@ CREATE TABLE IF NOT EXISTS items (
 CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
   title, body, content='items', content_rowid='rowid'
 );
+
+-- Keep FTS5 external-content index in sync with items.
+CREATE TRIGGER IF NOT EXISTS items_ai AFTER INSERT ON items BEGIN
+  INSERT INTO items_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
+END;
+CREATE TRIGGER IF NOT EXISTS items_ad AFTER DELETE ON items BEGIN
+  INSERT INTO items_fts(items_fts, rowid, title, body)
+    VALUES('delete', old.rowid, old.title, old.body);
+END;
+CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
+  INSERT INTO items_fts(items_fts, rowid, title, body)
+    VALUES('delete', old.rowid, old.title, old.body);
+  INSERT INTO items_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
+END;
