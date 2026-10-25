@@ -186,7 +186,18 @@ class S3RawStore:
             return self._client
         import boto3  # lazy: local smoke must not require boto3 at import
 
-        kwargs: dict[str, Any] = {"region_name": self.region}
+        from botocore.config import Config
+
+        # Aliyun OSS rejects path-style (SecondLevelDomainForbidden); force virtual-hosted.
+        kwargs: dict[str, Any] = {
+            "region_name": self.region,
+            "config": Config(
+                s3={"addressing_style": "virtual"},
+                # botocore≥1.36 default CRC32 trailer breaks Aliyun OSS PutObject
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            ),
+        }
         if self.endpoint_url:
             kwargs["endpoint_url"] = self.endpoint_url
         if self.access_key and self.secret_key:

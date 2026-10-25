@@ -8,10 +8,19 @@
 
 ## 1. OSS bucket（S3 兼容）
 
-建议新建独立 bucket，例如 `evidplane-raw-<region>`（名称以控制台可用为准）。
+**已创建（2026-10-25，主账号控制台，未建 RAM / 未下发 AK）：**
+
+| 项 | 值 |
+|---|---|
+| Bucket | `evidplane-raw` |
+| 地域 | 华东1（杭州）`oss-cn-hangzhou`（与 ECS `47.98.252.185` 同城） |
+| Endpoint | `https://oss-cn-hangzhou.aliyuncs.com` |
+| 存储 | 标准存储 + 本地冗余（LRS） |
+| 访问 | 私有；阻止公共访问已开启 |
+| 隔离 | **不是** `dbradar-dev`（华北2 北京）。不要在北京再建 Evidplane bucket。 |
 
 - **API**：S3 兼容；客户端用 `boto3` + `endpoint_url`（阿里云 OSS）。
-- **区域**：与 ECS 同区，减少出网；endpoint 形如 `https://oss-cn-hangzhou.aliyuncs.com`（按实际地域改）。
+- **区域**：与 ECS 同区，减少出网；endpoint 为 `https://oss-cn-hangzhou.aliyuncs.com`。
 - **密钥**：RAM 子用户，仅本 bucket 的 `GetObject` / `PutObject` / `HeadObject` / `ListBucket`（前缀限定更好）。密钥只进 ECS 环境变量或实例角色，**不上仓**。
 - **与 dbradar 隔离**：单独 bucket + 单独 RAM 用户/角色；不要复用 Topic Plane 的 AK。
 
