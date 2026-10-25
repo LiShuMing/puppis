@@ -135,16 +135,23 @@ Agent **不**持有平台 token；不读桶。
 
 ## 6.2 开源候选与评测门槛（可换 Lake 内核）
 
-原则：**契约自有、内核可换**。OSS raw + `item_id` / MCP `search|get|pack`  equip；评测达标则适配进 Lake，不达标再自研薄层。
+原则：**契约自有、内核可换**。OSS raw + `item_id` / MCP `search|get|pack` 锁定；评测达标则 adapter 进 Lake，不达标再自研薄层。**评测不挡 L0 狗粮。**
 
-| 候选 | 评什么 | 过线门槛（L0 后） |
+只比 **FTS/向量召回与可选抽取层**，不整仓换 Mem0/Letta 产品壳。
+
+| 候选 | 评什么 | 过线门槛 |
 |---|---|---|
-| mnemon / local-memory-mcp 等 FTS MCP | 延迟、许可（MIT 优先）、能否只作检索后端 | p95 search <200ms @1万条；可剥离其「记忆写入」叙事 |
-| sqlite-vec / pgvector | 召回@10 vs 纯 FTS | 相对 FTS 有可测增益再上；L0 不挡 |
-| AgentsView（只读） | session 源 connector，非 Lake 核 | 能 `pull(since)` 进 raw；不当第一手事实 |
-| 抽取/Pack 库 | 是否绑死模型供应商 | 必须可换模型；输出挂 `item_id` |
+| 自研 SQLite FTS5（基线） | 延迟、命中、可回源 | 对照基准 |
+| sqlite-vec / pgvector | 相对 FTS 的召回@10 | 有可测增益再上；L0 不强制 |
+| Mem0、Letta/MemGPT 类 | 召回层能否剥成 adapter | 保留 `item_id`/`source_url`；许可允许嵌自持 OSS；不绑死写入叙事 |
+| LightRAG / 轻量 GraphRAG | 图召回增益 vs 复杂度 | 可重建 derived；不过线不引入 |
+| AgentsView（只读） | session **源** connector | `pull(since)`→raw；不当第一手事实 |
 
-评测集：本人近 14 天 Notion|日历（+可选假 GitHub）固定 query 20 条；记录命中、漏报、延迟、许可证。L0 狗粮不等人；评测并行。
+**连接器额外门槛（Phase 2，社交/@X）**
+- 必须官方只读 API（OAuth/配额）；ToS 禁止的抓取/非官方客户端 **直接剔除**。
+- 必须保住 `source_url` + `item_id` 回源；许可允许写入自持 OSS。
+
+评测集：近 14 天 Notion|日历固定 query≈20；同 token 预算记命中/漏报/延迟/许可。@Noa 可排对照轮。
 
 ## 7. 仓内目录
 
