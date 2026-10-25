@@ -20,7 +20,7 @@ from connectors.notion.adapter import (  # noqa: E402
 from lake.api import pack, search  # noqa: E402
 from lake.db import default_db_path  # noqa: E402
 from lake.ingest import ingest_pull_records  # noqa: E402
-from lake.raw_store import LocalRawStore, default_raw_root  # noqa: E402
+from lake.raw_store import LocalRawStore, default_raw_root, open_raw_store  # noqa: E402
 
 
 def _parse_since(value: str | None) -> datetime | None:
@@ -111,8 +111,10 @@ def main() -> int:
         )
     )
 
-    raw_root = Path(args.raw_root).expanduser() if args.raw_root else default_raw_root()
-    store = LocalRawStore(raw_root)
+    if args.raw_root:
+        store = LocalRawStore(Path(args.raw_root).expanduser())
+    else:
+        store = open_raw_store()
     db = args.db or str(default_db_path())
     result = ingest_pull_records(
         records,

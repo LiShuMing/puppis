@@ -9,7 +9,7 @@ from typing import Any, Iterable
 from connectors.base import PullRecord
 from lake.db import connect, default_db_path, init_db
 from lake.models import Evidence
-from lake.raw_store import LocalRawStore
+from lake.raw_store import RawStore, open_raw_store
 
 _SH_TZ = timezone(timedelta(hours=8))
 _DEFAULT_SOURCE_PREFIX = "src"
@@ -123,13 +123,13 @@ def upsert_evidence(
 def ingest_pull_records(
     records: Iterable[PullRecord],
     *,
-    raw_store: LocalRawStore | None = None,
+    raw_store: RawStore | None = None,
     source_id: str | None = None,
     db_path: str | Path | None = None,
     config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Write raw objects then upsert Evidence derived from PullRecords."""
-    store = raw_store or LocalRawStore()
+    store = raw_store or open_raw_store()
     evidence: list[Evidence] = []
     raw_uris: list[str] = []
     for rec in records:

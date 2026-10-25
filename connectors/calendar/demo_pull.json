@@ -1,0 +1,39 @@
+{
+  "events": [
+    {
+      "id": "evt_evidplane_sync_001",
+      "summary": "Evidplane L0 sync review",
+      "description": "Review Notion fixture → pack(work) dogfood and OSS raw layout.",
+      "htmlLink": "https://calendar.google.com/calendar/event?eid=evt_evidplane_sync_001",
+      "status": "confirmed",
+      "updated": "2026-10-24T10:00:00.000Z",
+      "start": { "dateTime": "2026-10-25T14:00:00+08:00", "timeZone": "Asia/Shanghai" },
+      "end": { "dateTime": "2026-10-25T15:00:00+08:00", "timeZone": "Asia/Shanghai" },
+      "organizer": { "email": "owner@example.com", "self": true },
+      "attendees": [
+        { "email": "owner@example.com", "self": true, "responseStatus": "accepted" },
+        { "email": "tech@example.com", "responseStatus": "accepted" }
+      ]
+    },
+    {
+      "id": "evt_oss_bucket_002",
+      "summary": "OSS bucket isolation check",
+      "description": "Confirm evidplane bucket is separate from dbradar / Topic Plane.",
+      "htmlLink": "https://calendar.google.com/calendar/event?eid=evt_oss_bucket_002",
+      "status": "confirmed",
+      "updated": "2026-10-23T03:30:00.000Z",
+      "start": { "dateTime": "2026-10-26T10:00:00+08:00", "timeZone": "Asia/Shanghai" },
+      "end": { "dateTime": "2026-10-26T10:30:00+08:00", "timeZone": "Asia/Shanghai" }
+    },
+    {
+      "id": "evt_mcp_smoke_003",
+      "summary": "Cursor MCP pack(work) smoke",
+      "description": "Hang puppis MCP in Cursor; pack(work) must cite calendar + notion fixtures.",
+      "htmlLink": "https://calendar.google.com/calendar/event?eid=evt_mcp_smoke_003",
+      "status": "confirmed",
+      "updated": "2026-10-25T01:00:00.000Z",
+      "start": { "dateTime": "2026-10-27T16:00:00+08:00", "timeZone": "Asia/Shanghai" },
+      "end": { "dateTime": "2026-10-27T17:00:00+08:00", "timeZone": "Asia/Shanghai" }
+    }
+  ]
+}
