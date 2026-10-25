@@ -1,8 +1,8 @@
-# Puppis — MVP SPEC（开工版）
+# Evidplane (repo: puppis) — MVP SPEC（开工版）
 
 | 字段 | 内容 |
 |---|---|
-| 产品暂名 | **Puppis**（船尾座；与 Carina/Vela 同属南船；航迹=工作足迹证据） |
+| 产品名 | **Evidplane**（Evidence + Plane）；仓暂名 `puppis`，域名拟 `evidplane.com` |
 | 版本 | SPEC v0.1 · 2026-10-25 Asia/Shanghai |
 | 楔子 | 工程师工作上下文（L0：Notion **或** 日历 1 源 → OSS Evidence → `pack(work)` → Cursor） |
 | 非目标 | 聊天壳、Mem0 克隆、代发、全网爬、与 Topic Plane 共桶/共队列 |
@@ -77,7 +77,7 @@
 OSS 布局：
 
 ```
-s3://<bucket>/puppis/
+s3://<bucket>/evidplane/
   sources/<connector_id>/
     raw/<yyyy>/<mm>/<item_id>.json
     errors/<yyyy>/<mm>/...
@@ -143,15 +143,15 @@ puppis/
 
 ---
 
-## 9. 命名备选（未定可改仓名）
+## 9. 品牌与域名（已拍板）
 
-| 名 | 寓意 |
+| 项 | 值 |
 |---|---|
-| **Puppis**（推荐） | 船尾座；航迹/足迹；接现有星座仓命名 |
-| Reliquary | 证据匣；偏文学 |
-| Witness | 可回放见证；直白 |
+| 品牌 | **Evidplane** |
+| 域名 | `evidplane.com`（先 1 年；@阿里云 万网下单） |
+| 仓名 | 暂 `puppis`，域名落地后再 rename |
 
-域名调研与品牌冲突检查交给 @阿里云；技术仓先用 `puppis`。
+历史候选（已弃）：Mneme / Citepack / Evidora / Puppis 作品牌名。
 
 ---
 
