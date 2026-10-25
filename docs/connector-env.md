@@ -6,10 +6,10 @@
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `EVIDPLANE_RAW_BACKEND` | `local` | `local` 或 `s3` / `oss` / `minio` |
+| `EVIDPLANE_RAW_BACKEND` | `local` | `local` 或 `s3`（S3 兼容：OSS / MinIO） |
 | `EVIDPLANE_RAW_ROOT` | `~/.evidplane` | 仅 local |
 | `EVIDPLANE_S3_*` / `AWS_*` | — | 见 `deploy-ecs-oss.md` |
-| SQLite | `data/puppis.db` | 或 Lake API 的 `db_path` |
+| `EVIDPLANE_DB`（别名 `PUPPIS_DB`） | `data/puppis.db` | SQLite 路径；或 Lake API 的 `db_path` 参数 |
 
 ## Notion（`connectors/notion`）
 
@@ -51,4 +51,5 @@ cd /workspace/puppis
 .venv/bin/python scripts/smoke_lake.py
 .venv/bin/python scripts/ingest_notion.py --fixture --smoke-pack
 .venv/bin/python scripts/ingest_calendar.py --fixture --smoke-pack
+.venv/bin/python scripts/smoke_l0_quality.py   # 幂等/错误路径/pack 预算/MCP 质量门（独立临时 DB，不碰 EVIDPLANE_DB）
 ```

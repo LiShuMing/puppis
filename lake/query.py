@@ -160,14 +160,33 @@ def get(item_id: str, *, db_path: str | None = None) -> dict[str, Any]:
         conn.close()
 
 
+def _trim_to_budget(text: str, budget: int) -> str:
+    """Hard-trim text so _estimate_tokens(text) <= budget."""
+    if budget <= 0:
+        return ""
+    if _estimate_tokens(text) <= budget:
+        return text
+    # Ceil estimate uses 4 chars/token; keep a little headroom via byte trim loop.
+    max_chars = max(0, budget * _CHARS_PER_TOKEN)
+    trimmed = text[:max_chars]
+    while trimmed and _estimate_tokens(trimmed) > budget:
+        trimmed = trimmed[: max(0, len(trimmed) - _CHARS_PER_TOKEN)]
+    return trimmed
+
+
 def pack_work(
     budget_tokens: int = 3000,
     since_days: int = 7,
     *,
     db_path: str | None = None,
 ) -> dict[str, Any]:
-    """Assemble recent high-signal items into a work Pack with cites."""
-    budget = int(budget_tokens)
+    """Assemble recent high-signal items into a work Pack with cites.
+
+    Hard contract: token_estimate <= budget_tokens. Items/cites are selected
+    greedily (newest first); the first oversize block may be truncated to fit
+    remaining budget; further items are skipped.
+    """
+    budget = max(1, int(budget_tokens))
     days = int(since_days)
     conn = _ensure_db(db_path)
     try:
@@ -187,15 +206,19 @@ def pack_work(
         cites: list[dict[str, Any]] = []
         header = (
             f"# Evidplane pack(work)\n"
-            f"Window: last {days} day(s) · budget ≈ {budget} tokens\n"
+            f"Window: last {days} day(s) · budget ≤ {budget} tokens\n"
             f"Generated: {_now().isoformat()}\n\n"
         )
+        header = _trim_to_budget(header, budget)
         used = _estimate_tokens(header)
         body_parts = [header]
 
         for row in rows:
             if cutoff is not None and _parse_ts(row["captured_at"]) < cutoff:
                 continue
+            remain = budget - used
+            if remain <= 0:
+                break
             title = row["title"] or row["item_id"]
             excerpt = (row["body"] or "").strip()
             if len(excerpt) > 600:
@@ -208,11 +231,14 @@ def pack_work(
                 f"{excerpt}\n\n"
             )
             cost = _estimate_tokens(block)
-            if selected and used + cost > budget:
-                break
-            if not selected and used + cost > budget:
-                block = block[: max(budget * _CHARS_PER_TOKEN - used * _CHARS_PER_TOKEN, 200)]
+            if cost > remain:
+                if selected:
+                    break
+                # First item: truncate to remaining budget (may omit if too tight).
+                block = _trim_to_budget(block, remain)
                 cost = _estimate_tokens(block)
+                if cost == 0 or cost > remain:
+                    break
             body_parts.append(block)
             used += cost
             selected.append(_row_to_meta(row))
@@ -228,7 +254,18 @@ def pack_work(
 
         text = "".join(body_parts)
         if not selected:
-            text += "_No evidence in window. Seed or sync a connector._\n"
+            empty_note = "_No evidence in window. Seed or sync a connector._\n"
+            remain = budget - _estimate_tokens(text)
+            if remain > 0:
+                text += _trim_to_budget(empty_note, remain)
+
+        text = _trim_to_budget(text, budget)
+        # Drop cites whose item_id no longer appears after hard trim.
+        if selected:
+            kept_ids = {c["item_id"] for c in cites if f"[{c['item_id']}]" in text}
+            if len(kept_ids) < len(cites):
+                cites = [c for c in cites if c["item_id"] in kept_ids]
+                selected = [i for i in selected if i["item_id"] in kept_ids]
 
         return {
             "template": "work",

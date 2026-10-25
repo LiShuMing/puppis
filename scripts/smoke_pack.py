@@ -44,6 +44,9 @@ def main() -> int:
     assert p["item_count"] >= 1, "expected at least one pack item"
     assert p["cites"], "expected cites"
     assert all(c.get("item_id") for c in p["cites"])
+    assert p["token_estimate"] <= p["budget_tokens"], (
+        f"pack must hard-cap estimate at budget: {p['token_estimate']} > {p['budget_tokens']}"
+    )
     print("\nSMOKE_PACK OK")
     return 0
 

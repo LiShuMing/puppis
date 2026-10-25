@@ -1,0 +1,35 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Evidplane//L0 Demo//EN
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+UID:evt_evidplane_sync_001
+DTSTAMP:20261024T100000Z
+DTSTART;TZID=Asia/Shanghai:20261025T140000
+DTEND;TZID=Asia/Shanghai:20261025T150000
+SUMMARY:Evidplane L0 sync review
+DESCRIPTION:Review Notion fixture → pack(work) dogfood and OSS raw layout.
+STATUS:CONFIRMED
+URL:https://calendar.google.com/calendar/event?eid=evt_evidplane_sync_001
+END:VEVENT
+BEGIN:VEVENT
+UID:evt_oss_bucket_002
+DTSTAMP:20261023T033000Z
+DTSTART;TZID=Asia/Shanghai:20261026T100000
+DTEND;TZID=Asia/Shanghai:20261026T103000
+SUMMARY:OSS bucket isolation check
+DESCRIPTION:Confirm evidplane bucket is separate from dbradar / Topic Plane.
+STATUS:CONFIRMED
+URL:https://calendar.google.com/calendar/event?eid=evt_oss_bucket_002
+END:VEVENT
+BEGIN:VEVENT
+UID:evt_mcp_smoke_003
+DTSTAMP:20261025T010000Z
+DTSTART;TZID=Asia/Shanghai:20261027T160000
+DTEND;TZID=Asia/Shanghai:20261027T170000
+SUMMARY:Cursor MCP pack(work) smoke
+DESCRIPTION:Hang puppis MCP in Cursor; pack(work) must cite calendar + notion fixtures.
+STATUS:CONFIRMED
+URL:https://calendar.google.com/calendar/event?eid=evt_mcp_smoke_003
+END:VEVENT
+END:VCALENDAR

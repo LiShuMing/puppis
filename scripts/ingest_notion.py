@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ingest Notion → raw (file://) → lake. Offline: --fixture. Live: NOTION_* env."""
+"""Ingest Notion → raw (file:// or S3) → lake. Offline: --fixture. Live: NOTION_* env."""
 from __future__ import annotations
 
 import argparse
@@ -19,8 +19,8 @@ from connectors.notion.adapter import (  # noqa: E402
 )
 from lake.api import pack, search  # noqa: E402
 from lake.db import default_db_path  # noqa: E402
-from lake.ingest import ingest_pull_records  # noqa: E402
-from lake.raw_store import LocalRawStore, default_raw_root, open_raw_store  # noqa: E402
+from lake.ingest import IngestError, ingest_pull_records  # noqa: E402
+from lake.raw_store import LocalRawStore, open_raw_store  # noqa: E402
 
 
 def _parse_since(value: str | None) -> datetime | None:
@@ -36,6 +36,20 @@ def _parse_since(value: str | None) -> datetime | None:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def _open_store(raw_root: str | None):
+    if raw_root:
+        return LocalRawStore(Path(raw_root).expanduser())
+    return open_raw_store()
+
+
+def _record_error(store, name: str, payload: dict) -> str | None:
+    try:
+        return store.write_error("notion", name, payload)
+    except Exception as exc:
+        print(f"warning: could not write errors/: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return None
 
 
 def main() -> int:
@@ -54,7 +68,7 @@ def main() -> int:
         default=None,
         help="ISO timestamp or Nd (e.g. 30d). Default: all / API filter none",
     )
-    p.add_argument("--db", default=None, help="SQLite path (default data/puppis.db)")
+    p.add_argument("--db", default=None, help="SQLite path (default data/puppis.db or EVIDPLANE_DB)")
     p.add_argument(
         "--raw-root",
         default=None,
@@ -77,13 +91,14 @@ def main() -> int:
         )
         return 2
 
+    store = _open_store(args.raw_root)
+    mode = "fixture" if fixture is not None else "api"
+
     try:
         if fixture is not None:
             connector = NotionConnector(fixture_path=fixture)
-            mode = "fixture"
         else:
             connector = NotionConnector()
-            mode = "api"
         health = connector.health()
         # health never includes token
         print("=== health ===")
@@ -91,11 +106,35 @@ def main() -> int:
         since = _parse_since(args.since)
         records = connector.pull(since=since)
     except NotionConfigError as e:
+        err_uri = _record_error(
+            store,
+            f"config_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
+            {
+                "stage": "config",
+                "mode": mode,
+                "error": "NotionConfigError",
+                "message": str(e),
+            },
+        )
         print(f"config error: {e}", file=sys.stderr)
+        if err_uri:
+            print(f"error_uri: {err_uri}", file=sys.stderr)
         return 2
     except Exception as e:
         # Avoid dumping request headers / token on HTTP errors.
+        err_uri = _record_error(
+            store,
+            f"pull_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
+            {
+                "stage": "pull",
+                "mode": mode,
+                "error": type(e).__name__,
+                "message": str(e),
+            },
+        )
         print(f"pull failed: {type(e).__name__}: {e}", file=sys.stderr)
+        if err_uri:
+            print(f"error_uri: {err_uri}", file=sys.stderr)
         return 1
 
     print(f"\n=== pull ({mode}) ===")
@@ -111,18 +150,21 @@ def main() -> int:
         )
     )
 
-    if args.raw_root:
-        store = LocalRawStore(Path(args.raw_root).expanduser())
-    else:
-        store = open_raw_store()
     db = args.db or str(default_db_path())
-    result = ingest_pull_records(
-        records,
-        raw_store=store,
-        source_id="src_notion",
-        db_path=db,
-        config={"mode": mode, "since": args.since},
-    )
+    try:
+        result = ingest_pull_records(
+            records,
+            raw_store=store,
+            source_id="src_notion",
+            db_path=db,
+            config={"mode": mode, "since": args.since},
+        )
+    except IngestError as e:
+        print(f"ingest failed: {e}", file=sys.stderr)
+        if e.error_uri:
+            print(f"error_uri: {e.error_uri}", file=sys.stderr)
+        return 1
+
     # Do not print raw body; uris are local paths only.
     print("\n=== ingest ===")
     print(
@@ -130,6 +172,9 @@ def main() -> int:
             {
                 "db": result["db"],
                 "upserted": result["upserted"],
+                "inserted": result.get("inserted"),
+                "updated": result.get("updated"),
+                "unchanged": result.get("unchanged"),
                 "by_connector": result["by_connector"],
                 "raw_root": result["raw_root"],
                 "raw_uri_count": len(result.get("raw_uris") or []),
@@ -151,6 +196,8 @@ def main() -> int:
                 {
                     "search_notion_count": s["count"],
                     "pack_item_count": pk.get("item_count"),
+                    "pack_token_estimate": pk.get("token_estimate"),
+                    "pack_budget_tokens": pk.get("budget_tokens"),
                     "notion_cites": [
                         {"item_id": c["item_id"], "title": c["title"]}
                         for c in notion_cites
@@ -162,6 +209,9 @@ def main() -> int:
         )
         if s["count"] < 1:
             print("SMOKE FAIL: no notion items in lake", file=sys.stderr)
+            return 1
+        if int(pk.get("token_estimate") or 0) > int(pk.get("budget_tokens") or 0):
+            print("SMOKE FAIL: pack exceeds budget_tokens", file=sys.stderr)
             return 1
         print("\nINGEST SMOKE OK")
     return 0

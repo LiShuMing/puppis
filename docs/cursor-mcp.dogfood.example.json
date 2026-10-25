@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "evidplane": {
+      "command": "/ABSOLUTE/PATH/to/puppis/.venv/bin/python",
+      "args": ["-m", "serve.mcp_server"],
+      "cwd": "/ABSOLUTE/PATH/to/puppis",
+      "env": {
+        "PYTHONPATH": "/ABSOLUTE/PATH/to/puppis",
+        "EVIDPLANE_DB": "/ABSOLUTE/PATH/to/puppis/data/evidplane_dogfood.db"
+      }
+    }
+  }
+}

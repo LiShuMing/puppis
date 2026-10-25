@@ -10,11 +10,12 @@ python3 -m venv .venv
 .venv/bin/pip install -e .
 ```
 
-Optional paths:
+Optional paths (defaults shown):
 
 ```bash
-export EVIDPLANE_DB=/path/to/puppis/data/evidplane.db
-export EVIDPLANE_RAW_ROOT=~/.evidplane          # raw file:// layout
+export EVIDPLANE_DB=/path/to/data.db           # default: data/puppis.db
+export EVIDPLANE_RAW_ROOT=~/.evidplane         # raw file:// layout (default ~/.evidplane)
+export EVIDPLANE_RAW_BACKEND=local             # local | s3 (S3-compatible, incl. OSS/MinIO)
 ```
 
 ## 1) Fake seed + MCP smoke (no Notion)
@@ -22,7 +23,15 @@ export EVIDPLANE_RAW_ROOT=~/.evidplane          # raw file:// layout
 ```bash
 PYTHONPATH=. .venv/bin/python -m lake.seed --force
 PYTHONPATH=. .venv/bin/python scripts/smoke_lake.py
+PYTHONPATH=. .venv/bin/python scripts/smoke_pack.py
+PYTHONPATH=. .venv/bin/python scripts/smoke_mcp.py
 PYTHONPATH=. .venv/bin/python -m serve.mcp_server   # stdio
+```
+
+Full L0 quality gate (idempotent double ingest, error paths → `errors/`, pack budget, MCP):
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/smoke_l0_quality.py
 ```
 
 ## 2) Notion connector → raw → lake (offline fixture)
@@ -35,6 +44,9 @@ PYTHONPATH=. .venv/bin/python scripts/ingest_notion.py --fixture --smoke-pack
 
 Uses `connectors/notion/demo_pull.json`. Raw lands under
 `$EVIDPLANE_RAW_ROOT/sources/notion/raw/yyyy/mm/<item_id>.json` (default `~/.evidplane`).
+Ingest is idempotent by `item_id` (re-pull → `inserted/updated/unchanged` stats, no duplicate
+rows). On a raw-write failure the error record goes to `sources/<connector>/errors/yyyy/mm/*.json`
+and the run fails loudly (`IngestError`), never silently.
 
 ## 3) Notion live pull (optional)
 
@@ -61,7 +73,7 @@ If `NOTION_TOKEN` is missing, the script exits with a clear config error (use `-
       "cwd": "/ABSOLUTE/PATH/to/puppis",
       "env": {
         "PYTHONPATH": "/ABSOLUTE/PATH/to/puppis",
-        "EVIDPLANE_DB": "/ABSOLUTE/PATH/to/puppis/data/evidplane.db"
+        "EVIDPLANE_DB": "/ABSOLUTE/PATH/to/puppis/data/puppis.db"
       }
     }
   }
@@ -76,11 +88,13 @@ After Notion ingest, in Cursor: **search** `source=notion`, **pack** `template=w
 |---|---|---|
 | `search` | `q?`, `source?`, `since_days?`, `limit?` | FTS5 when `q` set |
 | `get` | `item_id` | Full text + `source_url` |
-| `pack` | `template=work`, `budget_tokens?`, `since_days?` | Cites + token estimate |
+| `pack` | `template=work`, `budget_tokens?`, `since_days?` | Cites + token estimate; hard cap: `token_estimate <= budget_tokens` |
 | `list_connectors` | — | Stub listing |
 
 ## Boundaries
 
 - **connectors** → `PullRecord[]` only (no `serve/`, no lake writes).
-- **lake** owns raw (`content_sha256` + `raw_uri`) and SQLite upsert.
+- **lake** owns raw (`content_sha256` + `raw_uri`) and SQLite upsert (idempotent by `item_id`;
+  write failures recorded under `sources/<connector>/errors/`).
+- **pack budget is a hard contract**: `pack_work` trims output so `token_estimate <= budget_tokens`.
 - **serve** reads lake only — never Notion tokens.

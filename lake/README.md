@@ -11,3 +11,12 @@ Evidence store: SQLite + FTS5, local `file://` or S3-compatible raw, pack compil
 | `seed.py` | Fake dogfood data |
 
 Does **not** call platform APIs. OSS layout + ECS path: `docs/deploy-ecs-oss.md`.
+
+Contracts:
+
+- **Idempotent ingest** — upsert by `item_id`; repeated pulls report `inserted` / `updated` /
+  `unchanged` and never duplicate item rows. Identical content adds no `raw_objects` rows.
+- **No silent drops** — a raw-write failure is recorded under
+  `sources/<connector>/errors/yyyy/mm/*.json` and raises `IngestError` (with `error_uri`).
+- **Pack budget is a hard cap** — `pack_work` trims output so
+  `token_estimate <= budget_tokens` (default budget 3000 when unset, see `_DEFAULT_PACK_BUDGET`).
