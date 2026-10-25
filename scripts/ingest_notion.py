@@ -54,7 +54,7 @@ def main() -> int:
         default=None,
         help="ISO timestamp or Nd (e.g. 30d). Default: all / API filter none",
     )
-    p.add_argument("--db", default=None, help="SQLite path (default data/evidplane.db)")
+    p.add_argument("--db", default=None, help="SQLite path (default data/puppis.db)")
     p.add_argument(
         "--raw-root",
         default=None,

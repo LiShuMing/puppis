@@ -1,4 +1,8 @@
-"""Evidplane MCP server: search / get / pack over the local lake (stdio)."""
+"""Evidplane MCP server: search / get / pack over the local lake (stdio).
+
+Uses mcp>=2 MCPServer (FastMCP rename). Serve talks only to lake — never
+platform APIs.
+"""
 from __future__ import annotations
 
 import json
@@ -13,8 +17,10 @@ if str(_ROOT) not in sys.path:
 
 from mcp.server.mcpserver import MCPServer
 
-from lake import api as lake_api
-from lake.db import default_db_path, item_count
+from lake.db import connect, default_db_path, init_db, item_count
+from lake.query import get as lake_get
+from lake.query import pack as lake_pack
+from lake.query import search as lake_search
 from lake.seed import seed_fake
 
 server = MCPServer(
@@ -32,8 +38,6 @@ server = MCPServer(
 def _ensure_seeded() -> None:
     """Auto-seed fake Evidence once so Cursor dogfood works out of the box."""
     path = default_db_path()
-    from lake.db import connect, init_db
-
     conn = connect(path)
     try:
         init_db(conn)
@@ -62,7 +66,7 @@ def search(
 ) -> str:
     _ensure_seeded()
     return _json(
-        lake_api.search(q=q, source=source, since_days=since_days, limit=limit)
+        lake_search(q=q, source=source, since_days=since_days, limit=limit)
     )
 
 
@@ -72,7 +76,7 @@ def search(
 )
 def get(item_id: str) -> str:
     _ensure_seeded()
-    return _json(lake_api.get(item_id))
+    return _json(lake_get(item_id))
 
 
 @server.tool(
@@ -84,12 +88,12 @@ def get(item_id: str) -> str:
 )
 def pack(
     template: str = "work",
-    budget_tokens: int | None = 4000,
+    budget_tokens: int | None = 3000,
     since_days: int | None = 7,
 ) -> str:
     _ensure_seeded()
     return _json(
-        lake_api.pack(
+        lake_pack(
             template=template,
             budget_tokens=budget_tokens,
             since_days=since_days,
@@ -116,6 +120,11 @@ def list_connectors() -> str:
                     "status": "ingest_ready",
                     "note": "scripts/ingest_notion.py (--fixture or NOTION_TOKEN)",
                 },
+                {
+                    "connector_id": "github",
+                    "status": "fake_seed",
+                    "note": "PR-like seed items; real connector Phase 1+",
+                },
             ]
         }
     )
@@ -123,7 +132,6 @@ def list_connectors() -> str:
 
 def main() -> None:
     _ensure_seeded()
-    # mcp 2.x: run(transport='stdio') blocks on stdin.
     server.run(transport="stdio")
 
 

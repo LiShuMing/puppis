@@ -9,8 +9,8 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT))
 
-from lake.api import get, pack, search
 from lake.db import default_db_path
+from lake.query import get, pack, search
 from lake.seed import seed_fake
 
 
@@ -38,13 +38,13 @@ def main() -> int:
     assert "error" not in g
 
     print("\n=== pack(work) ===")
-    p = pack(template="work", budget_tokens=2000, since_days=7)
+    p = pack(template="work", budget_tokens=3000, since_days=14)
     print(
         json.dumps(
             {
                 "item_count": p["item_count"],
                 "token_estimate": p["token_estimate"],
-                "cites": p["cites"],
+                "cites": [{"item_id": c["item_id"], "title": c["title"]} for c in p["cites"]],
             },
             ensure_ascii=False,
             indent=2,

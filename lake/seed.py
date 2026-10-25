@@ -1,4 +1,4 @@
-"""Seed fake calendar/notion Evidence for MVP dogfood."""
+"""Seed fake calendar/notion/github Evidence for MVP dogfood."""
 from __future__ import annotations
 
 import hashlib
@@ -17,7 +17,6 @@ def _sha(text: str) -> str:
 
 def _fake_items(now: datetime | None = None) -> list[dict[str, Any]]:
     now = now or datetime.now(_SH_TZ)
-    # Mix of recent work signals (calendar events + notion pages).
     specs = [
         {
             "item_id": "cal_evt_20261024_standup",
@@ -59,6 +58,19 @@ def _fake_items(now: datetime | None = None) -> list[dict[str, Any]]:
             "captured_at": (now - timedelta(days=5)).isoformat(),
         },
         {
+            "item_id": "cal_evt_20261018_oss",
+            "source_id": "src_calendar_dogfood",
+            "connector_id": "google_calendar",
+            "kind": "event",
+            "title": "OSS layout walkthrough",
+            "body": (
+                "s3://bucket/evidplane/sources/<connector>/raw/yyyy/mm/<item_id>.json. "
+                "errors/ sibling. derived/ rebuildable."
+            ),
+            "source_url": "https://calendar.google.com/calendar/event?eid=fake_oss",
+            "captured_at": (now - timedelta(days=7, hours=1)).isoformat(),
+        },
+        {
             "item_id": "notion_pg_evidplane_spec",
             "source_id": "src_notion_dogfood",
             "connector_id": "notion",
@@ -78,7 +90,7 @@ def _fake_items(now: datetime | None = None) -> list[dict[str, Any]]:
             "kind": "page",
             "title": "Open questions — pack budget",
             "body": (
-                "Default pack(work) budget 4000 tokens. Truncate older items first. "
+                "Default pack(work) budget 3000 tokens. Truncate older items first. "
                 "Every cite must carry item_id + source_url for get()."
             ),
             "source_url": "https://www.notion.so/fake/open-questions-pack-budget",
@@ -98,19 +110,6 @@ def _fake_items(now: datetime | None = None) -> list[dict[str, Any]]:
             "captured_at": (now - timedelta(days=3)).isoformat(),
         },
         {
-            "item_id": "cal_evt_20261018_oss",
-            "source_id": "src_calendar_dogfood",
-            "connector_id": "google_calendar",
-            "kind": "event",
-            "title": "OSS layout walkthrough",
-            "body": (
-                "s3://bucket/evidplane/sources/<connector>/raw/yyyy/mm/<item_id>.json. "
-                "errors/ sibling. derived/ rebuildable."
-            ),
-            "source_url": "https://calendar.google.com/calendar/event?eid=fake_oss",
-            "captured_at": (now - timedelta(days=7, hours=1)).isoformat(),
-        },
-        {
             "item_id": "notion_pg_kill_signals",
             "source_id": "src_notion_dogfood",
             "connector_id": "notion",
@@ -123,6 +122,58 @@ def _fake_items(now: datetime | None = None) -> list[dict[str, Any]]:
             ),
             "source_url": "https://www.notion.so/fake/kill-signals",
             "captured_at": (now - timedelta(hours=20)).isoformat(),
+        },
+        {
+            "item_id": "gh_pr_12_mcp_stub",
+            "source_id": "src_github_dogfood",
+            "connector_id": "github",
+            "kind": "pr",
+            "title": "PR #12: MCP search/get/pack stub",
+            "body": (
+                "Merged fake Lake + stdio MCP so Cursor can dogfood pack(work). "
+                "Follow-up: real Notion pull(since) without touching Serve."
+            ),
+            "source_url": "https://github.com/LiShuMing/puppis/pull/12",
+            "captured_at": (now - timedelta(days=1, hours=4)).isoformat(),
+        },
+        {
+            "item_id": "gh_pr_9_schema",
+            "source_id": "src_github_dogfood",
+            "connector_id": "github",
+            "kind": "pr",
+            "title": "PR #9: SQLite FTS5 schema + triggers",
+            "body": (
+                "items table + items_fts external content with AI/AD/AU triggers. "
+                "raw_objects and sources for connector cursors."
+            ),
+            "source_url": "https://github.com/LiShuMing/puppis/pull/9",
+            "captured_at": (now - timedelta(days=4, hours=2)).isoformat(),
+        },
+        {
+            "item_id": "notion_pg_module_boundary",
+            "source_id": "src_notion_dogfood",
+            "connector_id": "notion",
+            "kind": "page",
+            "title": "模块边界 — Connectors / Lake / Serve",
+            "body": (
+                "禁止 connector 直写 MCP；禁止 Serve 调平台 API。 "
+                "扩展 = 新 connector 包或新 pack 模板。契约锚点 item_id。"
+            ),
+            "source_url": "https://www.notion.so/fake/module-boundary",
+            "captured_at": (now - timedelta(days=2, hours=10)).isoformat(),
+        },
+        {
+            "item_id": "cal_evt_20261022_demo",
+            "source_id": "src_calendar_dogfood",
+            "connector_id": "google_calendar",
+            "kind": "event",
+            "title": "Demo: pack(work) in Cursor",
+            "body": (
+                "Show Kevin pack cites round-trip via get(item_id). "
+                "Prep: seed_fake + puppis-mcp in mcp.json."
+            ),
+            "source_url": "https://calendar.google.com/calendar/event?eid=fake_demo",
+            "captured_at": (now - timedelta(days=3, hours=5)).isoformat(),
         },
     ]
     return specs
@@ -142,7 +193,6 @@ def seed_fake(db_path: str | Path | None = None, *, force: bool = False) -> dict
             conn.execute("DELETE FROM items")
             conn.execute("DELETE FROM raw_objects")
             conn.execute("DELETE FROM sources")
-            # Rebuild empty FTS content table
             conn.execute("INSERT INTO items_fts(items_fts) VALUES('rebuild')")
             conn.commit()
 
@@ -151,6 +201,7 @@ def seed_fake(db_path: str | Path | None = None, *, force: bool = False) -> dict
         sources = {
             "src_calendar_dogfood": ("google_calendar", '{"mode":"fake"}'),
             "src_notion_dogfood": ("notion", '{"mode":"fake"}'),
+            "src_github_dogfood": ("github", '{"mode":"fake"}'),
         }
         for sid, (cid, cfg) in sources.items():
             conn.execute(
@@ -207,7 +258,7 @@ def main() -> None:
     import json
 
     p = argparse.ArgumentParser(description="Seed fake Evidplane lake data")
-    p.add_argument("--db", default=None, help="SQLite path (default data/evidplane.db)")
+    p.add_argument("--db", default=None, help="SQLite path (default data/puppis.db)")
     p.add_argument("--force", action="store_true", help="Wipe items and reseed")
     args = p.parse_args()
     print(json.dumps(seed_fake(args.db, force=args.force), ensure_ascii=False, indent=2))

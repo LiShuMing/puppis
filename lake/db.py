@@ -10,10 +10,10 @@ _SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 
 def default_db_path() -> Path:
-    override = os.environ.get("EVIDPLANE_DB")
+    override = os.environ.get("EVIDPLANE_DB") or os.environ.get("PUPPIS_DB")
     if override:
         return Path(override).expanduser().resolve()
-    return (_REPO_ROOT / "data" / "evidplane.db").resolve()
+    return (_REPO_ROOT / "data" / "puppis.db").resolve()
 
 
 def connect(db_path: Path | str | None = None) -> sqlite3.Connection:
@@ -26,6 +26,7 @@ def connect(db_path: Path | str | None = None) -> sqlite3.Connection:
 
 
 def init_db(conn: sqlite3.Connection) -> None:
+    """Apply lake/schema.sql (items + FTS5 external-content + sync triggers)."""
     sql = _SCHEMA_PATH.read_text(encoding="utf-8")
     conn.executescript(sql)
     conn.commit()
