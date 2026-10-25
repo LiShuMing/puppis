@@ -1,11 +1,13 @@
 # lake
 
-Raw immutable store + rebuildable derived + FTS5 index + `pack(template)`.
+Evidence store: SQLite + FTS5, local `file://` raw layout, pack compiler.
 
-- `schema.sql` — sources / raw_objects / items / items_fts
-- `db.py` — SQLite connect + init (`EVIDPLANE_DB` or `data/evidplane.db`)
-- `api.py` — `search` / `get` / `pack` (Serve calls these only)
-- `seed.py` — fake calendar/notion Evidence for dogfood
-- `models.py` — Evidence pydantic contract (connectors → lake)
+| Module | Role |
+|---|---|
+| `models.py` | `Evidence` contract |
+| `raw_store.py` | Write immutable raw JSON (`content_sha256`, `file://` uri) |
+| `ingest.py` | `PullRecord[]` → raw + upsert items |
+| `api.py` | `search` / `get` / `pack` (serve reads only this) |
+| `seed.py` | Fake dogfood data |
 
-Does not call platform APIs.
+Does **not** call platform APIs.

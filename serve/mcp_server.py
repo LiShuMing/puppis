@@ -113,8 +113,8 @@ def list_connectors() -> str:
                 },
                 {
                     "connector_id": "notion",
-                    "status": "fake_seed",
-                    "note": "L0 dogfood seed only",
+                    "status": "ingest_ready",
+                    "note": "scripts/ingest_notion.py (--fixture or NOTION_TOKEN)",
                 },
             ]
         }

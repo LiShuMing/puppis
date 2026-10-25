@@ -1,45 +1,56 @@
-# Evidplane dogfood — fake Lake + MCP
+# Evidplane dogfood — Lake + MCP + Notion ingest
 
-Brand **Evidplane** · repo `puppis`. This doc covers the D1–2 gate: seeded Evidence → MCP `search` / `get` / `pack` in Cursor.
+Brand **Evidplane** · repo `puppis`.
 
 ## Setup
 
 ```bash
 cd /path/to/puppis
 python3 -m venv .venv
-.venv/bin/pip install -e .   # or: pip install 'mcp>=1.0' pydantic
+.venv/bin/pip install -e .
 ```
 
-Optional DB path (default `data/evidplane.db`):
+Optional paths:
 
 ```bash
 export EVIDPLANE_DB=/path/to/puppis/data/evidplane.db
+export EVIDPLANE_RAW_ROOT=~/.evidplane          # raw file:// layout
 ```
 
-## Seed + smoke (no Cursor)
+## 1) Fake seed + MCP smoke (no Notion)
 
 ```bash
-cd /path/to/puppis
 PYTHONPATH=. .venv/bin/python -m lake.seed --force
 PYTHONPATH=. .venv/bin/python scripts/smoke_lake.py
+PYTHONPATH=. .venv/bin/python -m serve.mcp_server   # stdio
 ```
 
-Smoke prints `item_id`s from `search` / `get` / `pack(work)`.
+## 2) Notion connector → raw → lake (offline fixture)
 
-## Run MCP (stdio)
+No token needed:
 
 ```bash
-cd /path/to/puppis
-PYTHONPATH=. .venv/bin/python -m serve.mcp_server
+PYTHONPATH=. .venv/bin/python scripts/ingest_notion.py --fixture --smoke-pack
 ```
 
-Or after editable install: `puppis-mcp`.
+Uses `connectors/notion/demo_pull.json`. Raw lands under
+`$EVIDPLANE_RAW_ROOT/sources/notion/raw/yyyy/mm/<item_id>.json` (default `~/.evidplane`).
 
-Empty DB auto-seeds fake calendar/notion items on first tool call.
+## 3) Notion live pull (optional)
 
-## Cursor `mcp.json` snippet
+Create a Notion internal integration, share a database or pages with it, then:
 
-User-level `~/.cursor/mcp.json` or project `.cursor/mcp.json`:
+```bash
+export NOTION_TOKEN=***  # integration secret          # never commit / never paste into chat logs
+export NOTION_DATABASE_ID=...        # and/or:
+export NOTION_PAGE_IDS=uuid1,uuid2
+
+PYTHONPATH=. .venv/bin/python scripts/ingest_notion.py --since 30d --smoke-pack
+```
+
+If `NOTION_TOKEN` is missing, the script exits with a clear config error (use `--fixture`).
+
+## Cursor `mcp.json`
 
 ```json
 {
@@ -57,7 +68,7 @@ User-level `~/.cursor/mcp.json` or project `.cursor/mcp.json`:
 }
 ```
 
-Then in Cursor Agent chat: call **pack** with `template=work`, or **search** with `q=standup`.
+After Notion ingest, in Cursor: **search** `source=notion`, **pack** `template=work`, **get** a cited `item_id`.
 
 ## Tools
 
@@ -66,9 +77,10 @@ Then in Cursor Agent chat: call **pack** with `template=work`, or **search** wit
 | `search` | `q?`, `source?`, `since_days?`, `limit?` | FTS5 when `q` set |
 | `get` | `item_id` | Full text + `source_url` |
 | `pack` | `template=work`, `budget_tokens?`, `since_days?` | Cites + token estimate |
-| `list_connectors` | — | Stub listing fake seeds |
+| `list_connectors` | — | Stub listing |
 
 ## Boundaries
 
-- Serve reads **lake only** — never connectors or platform tokens.
-- Fake seed ≠ production connector; real Notion/Calendar is the next milestone.
+- **connectors** → `PullRecord[]` only (no `serve/`, no lake writes).
+- **lake** owns raw (`content_sha256` + `raw_uri`) and SQLite upsert.
+- **serve** reads lake only — never Notion tokens.

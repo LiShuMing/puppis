@@ -11,6 +11,7 @@ Personal **Evidence lake + MCP** for coding agents: authorized sources → self-
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e .
 PYTHONPATH=. .venv/bin/python scripts/smoke_lake.py
+PYTHONPATH=. .venv/bin/python scripts/ingest_notion.py --fixture --smoke-pack
 PYTHONPATH=. .venv/bin/python -m serve.mcp_server   # stdio MCP for Cursor
 ```
 
