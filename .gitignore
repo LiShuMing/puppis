@@ -14,3 +14,4 @@ data/*
 !data/eval/
 !data/eval/**
 data/eval/workdir/
+.env.local
