@@ -1,0 +1,61 @@
+{
+  "item_id": "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2",
+  "source_url": "https://www.notion.so/open-questions-pack-budget-aaaaaaaaeeeeeeeeeee2",
+  "page": {
+    "object": "page",
+    "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeee2",
+    "created_time": "2026-10-22T04:00:00.000Z",
+    "last_edited_time": "2026-10-24T14:00:00.000Z",
+    "url": "https://www.notion.so/open-questions-pack-budget-aaaaaaaaeeeeeeeeeee2",
+    "properties": {
+      "Name": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "plain_text": "Open questions — pack budget",
+            "text": {
+              "content": "Open questions — pack budget"
+            }
+          }
+        ]
+      }
+    },
+    "blocks": [
+      {
+        "object": "block",
+        "id": "c1",
+        "type": "paragraph",
+        "paragraph": {
+          "rich_text": [
+            {
+              "type": "text",
+              "plain_text": "Default pack(work) budget 4000 tokens. Truncate older items first. Every cite must carry item_id + source_url for get().",
+              "text": {
+                "content": "Default pack(work) budget 4000 tokens. Truncate older items first. Every cite must carry item_id + source_url for get()."
+              }
+            }
+          ]
+        }
+      },
+      {
+        "object": "block",
+        "id": "c2",
+        "type": "to_do",
+        "to_do": {
+          "checked": false,
+          "rich_text": [
+            {
+              "type": "text",
+              "plain_text": "Decide whether agent_derived evidence needs human_reviewed before pack.",
+              "text": {
+                "content": "Decide whether agent_derived evidence needs human_reviewed before pack."
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

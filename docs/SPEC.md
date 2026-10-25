@@ -2,7 +2,7 @@
 
 | 字段 | 内容 |
 |---|---|
-| 产品名 | **Evidplane**（Evidence + Plane）；仓暂名 `puppis`，域名拟 `evidplane.com` |
+| 产品名 | **Evidplane**（Evidence + Plane）；仓暂名 `puppis`；域名 **`evidplane.com` 已注册至 2027-10-25** |
 | 版本 | SPEC v0.1 · 2026-10-25 Asia/Shanghai |
 | 楔子 | 工程师工作上下文（L0：Notion **或** 日历 1 源 → OSS Evidence → `pack(work)` → Cursor） |
 | 非目标 | 聊天壳、Mem0 克隆、代发、全网爬、与 Topic Plane 共桶/共队列 |
@@ -185,7 +185,7 @@ puppis/
 | 项 | 值 |
 |---|---|
 | 品牌 | **Evidplane** |
-| 域名 | `evidplane.com`（先 1 年；@阿里云 万网下单） |
+| 域名 | **`evidplane.com` 已购**（注册至 2027-10-25 Asia/Shanghai；@阿里云） |
 | 仓名 | 暂 `puppis`，域名落地后再 rename |
 
 历史候选（已弃）：Mneme / Citepack / Evidora / Puppis 作品牌名。

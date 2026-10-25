@@ -1,0 +1,384 @@
+{
+  "generated_at": "2026-10-25T22:01:28.581896+08:00",
+  "backend": "sqlite-fts5",
+  "repo_commit": "c9b9861972d6a30a4568ad15df225560e29db6d2",
+  "corpus": "data/eval/corpus/notion_demo_pull.json",
+  "queries_path": "data/eval/queries.json",
+  "db": "/workspace/puppis/data/eval/workdir/fts5-baseline.db",
+  "ingest": {
+    "skipped": false,
+    "upserted": 3,
+    "notion_items": null
+  },
+  "adapter_oneline": "Adapter plug-in: implement `search(q)->[{item_id,source_url,...}]` over the same `data/eval/corpus/` + `data/eval/queries.json`, then drop results beside `data/eval/results/<name>-baseline.{json,md}` (Noa/技术 own Mem0/Letta/LightRAG).",
+  "summary": {
+    "backend": "sqlite-fts5",
+    "query_count": 15,
+    "labeled_query_count": 14,
+    "negative_query_count": 1,
+    "latency_ms": {
+      "p50": 0.298,
+      "p95": 0.647,
+      "mean": 0.354,
+      "n": 75
+    },
+    "hit_at_k": {
+      "hit@1": 1.0,
+      "hit@3": 1.0,
+      "hit@5": 1.0
+    },
+    "provenance": {
+      "hits_with_item_id_and_source_url": 14,
+      "hits_checked": 14,
+      "rate": 1.0,
+      "all_queries_provenance_ok": true
+    },
+    "negatives": {
+      "empty_result_ok": 1,
+      "total": 1
+    }
+  },
+  "queries": [
+    {
+      "id": "q01",
+      "q": "Evidplane checklist",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+      ],
+      "latency_ms": {
+        "p50": 0.588,
+        "p95": 0.94,
+        "mean": 0.704,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "title match page1"
+    },
+    {
+      "id": "q02",
+      "q": "Topic Plane OSS buckets",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+      ],
+      "latency_ms": {
+        "p50": 0.31,
+        "p95": 0.354,
+        "mean": 0.312,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "body: do not share OSS with Topic Plane"
+    },
+    {
+      "id": "q03",
+      "q": "Calendar connector",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+      ],
+      "latency_ms": {
+        "p50": 0.27,
+        "p95": 0.307,
+        "mean": 0.279,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "body next step Calendar"
+    },
+    {
+      "id": "q04",
+      "q": "pack budget tokens",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"
+      ],
+      "latency_ms": {
+        "p50": 0.274,
+        "p95": 0.298,
+        "mean": 0.279,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "title+body pack budget"
+    },
+    {
+      "id": "q05",
+      "q": "source_url item_id",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"
+      ],
+      "latency_ms": {
+        "p50": 0.292,
+        "p95": 0.318,
+        "mean": 0.294,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "cite provenance requirement"
+    },
+    {
+      "id": "q06",
+      "q": "human_reviewed agent_derived",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"
+      ],
+      "latency_ms": {
+        "p50": 0.315,
+        "p95": 0.368,
+        "mean": 0.324,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "open todo on agent_derived"
+    },
+    {
+      "id": "q07",
+      "q": "4000 tokens",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"
+      ],
+      "latency_ms": {
+        "p50": 0.276,
+        "p95": 0.288,
+        "mean": 0.273,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "default pack budget number"
+    },
+    {
+      "id": "q08",
+      "q": "MVP non-goals",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"
+      ],
+      "latency_ms": {
+        "p50": 0.281,
+        "p95": 0.299,
+        "mean": 0.283,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "title match page3"
+    },
+    {
+      "id": "q09",
+      "q": "vector search AgentsView",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"
+      ],
+      "latency_ms": {
+        "p50": 0.619,
+        "p95": 0.652,
+        "mean": 0.606,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "out of L0 list"
+    },
+    {
+      "id": "q10",
+      "q": "GitHub multi-tenant SaaS",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"
+      ],
+      "latency_ms": {
+        "p50": 0.365,
+        "p95": 0.772,
+        "mean": 0.475,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "non-goals body"
+    },
+    {
+      "id": "q11",
+      "q": "Connector pull lake upsert",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+      ],
+      "latency_ms": {
+        "p50": 0.298,
+        "p95": 0.332,
+        "mean": 0.303,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "acceptance bullet"
+    },
+    {
+      "id": "q12",
+      "q": "Truncate older items",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"
+      ],
+      "latency_ms": {
+        "p50": 0.271,
+        "p95": 0.287,
+        "mean": 0.274,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "pack truncation rule"
+    },
+    {
+      "id": "q13",
+      "q": "polished console UI",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"
+      ],
+      "latency_ms": {
+        "p50": 0.311,
+        "p95": 0.336,
+        "mean": 0.312,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "non-goal UI"
+    },
+    {
+      "id": "q14",
+      "q": "dbradar",
+      "expected_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+      ],
+      "ranked_item_ids": [
+        "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+      ],
+      "latency_ms": {
+        "p50": 0.291,
+        "p95": 0.297,
+        "mean": 0.289,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": 1.0,
+        "hit@3": 1.0,
+        "hit@5": 1.0
+      },
+      "provenance_ok": true,
+      "notes": "unique token page1"
+    },
+    {
+      "id": "q15",
+      "q": "quantum cryptography blockchain",
+      "expected_item_ids": [],
+      "ranked_item_ids": [],
+      "latency_ms": {
+        "p50": 0.308,
+        "p95": 0.324,
+        "mean": 0.304,
+        "n": 5
+      },
+      "hits": {
+        "hit@1": null,
+        "hit@3": null,
+        "hit@5": null
+      },
+      "provenance_ok": true,
+      "notes": "negative: should miss all; empty expected"
+    }
+  ]
+}

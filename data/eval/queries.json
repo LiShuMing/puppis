@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "corpus": "data/eval/corpus/manifest.json",
+  "notes": "Labeled dogfood queries over frozen Notion fixture. FTS5 baseline uses lake.api.search. Adapter plug-in: same queries + corpus; return ranked item_ids.",
+  "k_values": [1, 3, 5],
+  "queries": [
+    {
+      "id": "q01",
+      "q": "Evidplane checklist",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"],
+      "notes": "title match page1"
+    },
+    {
+      "id": "q02",
+      "q": "Topic Plane OSS buckets",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"],
+      "notes": "body: do not share OSS with Topic Plane"
+    },
+    {
+      "id": "q03",
+      "q": "Calendar connector",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"],
+      "notes": "body next step Calendar"
+    },
+    {
+      "id": "q04",
+      "q": "pack budget tokens",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"],
+      "notes": "title+body pack budget"
+    },
+    {
+      "id": "q05",
+      "q": "source_url item_id",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"],
+      "notes": "cite provenance requirement"
+    },
+    {
+      "id": "q06",
+      "q": "human_reviewed agent_derived",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"],
+      "notes": "open todo on agent_derived"
+    },
+    {
+      "id": "q07",
+      "q": "4000 tokens",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"],
+      "notes": "default pack budget number"
+    },
+    {
+      "id": "q08",
+      "q": "MVP non-goals",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"],
+      "notes": "title match page3"
+    },
+    {
+      "id": "q09",
+      "q": "vector search AgentsView",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"],
+      "notes": "out of L0 list"
+    },
+    {
+      "id": "q10",
+      "q": "GitHub multi-tenant SaaS",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"],
+      "notes": "non-goals body"
+    },
+    {
+      "id": "q11",
+      "q": "Connector pull lake upsert",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"],
+      "notes": "acceptance bullet"
+    },
+    {
+      "id": "q12",
+      "q": "Truncate older items",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2"],
+      "notes": "pack truncation rule"
+    },
+    {
+      "id": "q13",
+      "q": "polished console UI",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3"],
+      "notes": "non-goal UI"
+    },
+    {
+      "id": "q14",
+      "q": "dbradar",
+      "expected_item_ids": ["notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"],
+      "notes": "unique token page1"
+    },
+    {
+      "id": "q15",
+      "q": "quantum cryptography blockchain",
+      "expected_item_ids": [],
+      "notes": "negative: should miss all; empty expected"
+    }
+  ]
+}

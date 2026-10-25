@@ -1,0 +1,33 @@
+{
+  "name": "evidplane-dogfood-notion-fixture",
+  "source": "connectors/notion/demo_pull.json (frozen copy)",
+  "fixture_path": "data/eval/corpus/notion_demo_pull.json",
+  "connector_id": "notion",
+  "item_count": 3,
+  "items": [
+    {
+      "item_id": "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1",
+      "title": "Evidplane L0 checklist",
+      "source_url": "https://www.notion.so/evidplane-l0-checklist-aaaaaaaaeeeeeeeeeee1",
+      "kind": "page",
+      "captured_at": "2026-10-25T08:30:00.000+00:00",
+      "text_chars": 210
+    },
+    {
+      "item_id": "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee2",
+      "title": "Open questions — pack budget",
+      "source_url": "https://www.notion.so/open-questions-pack-budget-aaaaaaaaeeeeeeeeeee2",
+      "kind": "page",
+      "captured_at": "2026-10-24T14:00:00.000+00:00",
+      "text_chars": 198
+    },
+    {
+      "item_id": "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee3",
+      "title": "MVP non-goals",
+      "source_url": "https://www.notion.so/mvp-non-goals-aaaaaaaaeeeeeeeeeee3",
+      "kind": "page",
+      "captured_at": "2026-10-18T09:00:00.000+00:00",
+      "text_chars": 116
+    }
+  ]
+}

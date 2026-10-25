@@ -1,0 +1,54 @@
+# Connector 环境变量（Notion + Calendar）
+
+密钥与 token **只进环境 / secret 管理，不上仓、不写日志、不进 health 返回值**。
+
+## 共用（Lake raw）
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `EVIDPLANE_RAW_BACKEND` | `local` | `local` 或 `s3` / `oss` / `minio` |
+| `EVIDPLANE_RAW_ROOT` | `~/.evidplane` | 仅 local |
+| `EVIDPLANE_S3_*` / `AWS_*` | — | 见 `deploy-ecs-oss.md` |
+| SQLite | `data/puppis.db` | 或 Lake API 的 `db_path` |
+
+## Notion（`connectors/notion`）
+
+| 变量 | 必需 | 说明 |
+|---|---|---|
+| `NOTION_TOKEN` | API 模式 | Internal integration secret |
+| `NOTION_DATABASE_ID` | API（与 PAGE_IDS 二选一） | 指定库 |
+| `NOTION_PAGE_IDS` | API（可选） | 逗号分隔 page id |
+
+离线：
+
+```bash
+python scripts/ingest_notion.py --fixture --smoke-pack
+```
+
+## Calendar（`connectors/calendar`，`connector_id=google_calendar`）
+
+| 变量 | 必需 | 说明 |
+|---|---|---|
+| `CALENDAR_ICS_PATH` | ICS 模式 | 本地 `.ics` |
+| `CALENDAR_ICS_URL` | ICS 模式 | 公开/授权 ICS URL |
+| `GOOGLE_CALENDAR_ICS_PATH` | 同上别名 | — |
+| `GOOGLE_CALENDAR_CREDENTIALS` | API（**未实现**） | OAuth client JSON 路径；TODO |
+| `GOOGLE_APPLICATION_CREDENTIALS` | API（**未实现**） | 服务账号；TODO |
+| `GOOGLE_CALENDAR_ID` | API（**未实现**） | 日历 id；TODO |
+
+离线 fixture：
+
+```bash
+python scripts/ingest_calendar.py --fixture --smoke-pack
+```
+
+API 模式目前会 `CalendarConfigError` 并提示用 fixture/ICS；OAuth 留待有 Google 凭据后补。
+
+## 狗粮最短路径（无云凭证）
+
+```bash
+cd /workspace/puppis
+.venv/bin/python scripts/smoke_lake.py
+.venv/bin/python scripts/ingest_notion.py --fixture --smoke-pack
+.venv/bin/python scripts/ingest_calendar.py --fixture --smoke-pack
+```
