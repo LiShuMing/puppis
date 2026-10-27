@@ -143,7 +143,7 @@ def _env_first(*names: str) -> str | None:
 
 
 class S3RawStore:
-    """S3-compatible raw store (Aliyun OSS / MinIO) via boto3. Lazy-imports boto3."""
+    """S3-compatible raw store (Aliyun OSS / MinIO) via Apache OpenDAL. Lazy-imports opendal."""
 
     def __init__(
         self,
@@ -154,6 +154,7 @@ class S3RawStore:
         secret_key: str | None = None,
         region: str | None = None,
         prefix: str | None = None,
+        operator: Any | None = None,
     ) -> None:
         self.bucket = bucket or _env_first("EVIDPLANE_S3_BUCKET", "AWS_S3_BUCKET")
         if not self.bucket:
@@ -179,32 +180,32 @@ class S3RawStore:
         )
         self.prefix = (raw_prefix or "evidplane").strip().strip("/")
         self.root = f"s3://{self.bucket}/{self.prefix}"
-        self._client: Any | None = None
+        self._operator = operator
 
-    def _get_client(self) -> Any:
-        if self._client is not None:
-            return self._client
-        import boto3  # lazy: local smoke must not require boto3 at import
+    def _get_operator(self) -> Any:
+        if self._operator is not None:
+            return self._operator
+        import opendal  # lazy: local storage does not require OpenDAL at import
 
-        from botocore.config import Config
-
-        # Aliyun OSS rejects path-style (SecondLevelDomainForbidden); force virtual-hosted.
-        kwargs: dict[str, Any] = {
-            "region_name": self.region,
-            "config": Config(
-                s3={"addressing_style": "virtual"},
-                # botocore≥1.36 default CRC32 trailer breaks Aliyun OSS PutObject
-                request_checksum_calculation="when_required",
-                response_checksum_validation="when_required",
-            ),
+        # OSS requires virtual-hosted addressing. OpenDAL does not send CRC32
+        # trailers by default, so no checksum override is needed for OSS.
+        kwargs: dict[str, str] = {
+            "bucket": self.bucket,
+            "region": self.region,
+            "root": "/",
+            "enable_virtual_host_style": "true",
         }
         if self.endpoint_url:
-            kwargs["endpoint_url"] = self.endpoint_url
+            kwargs["endpoint"] = self.endpoint_url
         if self.access_key and self.secret_key:
-            kwargs["aws_access_key_id"] = self.access_key
-            kwargs["aws_secret_access_key"] = self.secret_key
-        self._client = boto3.client("s3", **kwargs)
-        return self._client
+            kwargs.update(
+                access_key_id=self.access_key,
+                secret_access_key=self.secret_key,
+                disable_config_load="true",
+                disable_ec2_metadata="true",
+            )
+        self._operator = opendal.Operator("s3", **kwargs)
+        return self._operator
 
     def _key_for(
         self,
@@ -221,19 +222,16 @@ class S3RawStore:
     def _uri_for(self, key: str) -> str:
         return f"s3://{self.bucket}/{key}"
 
-    def _existing_sha256(self, client: Any, key: str) -> str | None:
-        """Return Metadata sha256 if object exists; None if missing."""
+    def _existing_sha256(self, operator: Any, key: str) -> str | None:
+        """Return sha256 metadata, treating missing or forbidden stat as a miss."""
+        from opendal.exceptions import NotFound, PermissionDenied
+
         try:
-            head = client.head_object(Bucket=self.bucket, Key=key)
-        except Exception as exc:  # botocore ClientError
-            resp = getattr(exc, "response", None) or {}
-            http = (resp.get("ResponseMetadata") or {}).get("HTTPStatusCode")
-            code = (resp.get("Error") or {}).get("Code")
-            # 403: some OSS policies deny HeadObject on missing keys — treat as miss (dedupe may no-op).
-            if http in (403, 404) or code in ("404", "NoSuchKey", "NotFound"):
-                return None
-            raise
-        meta = head.get("Metadata") or {}
+            metadata = operator.stat(key)
+        except (NotFound, PermissionDenied):
+            # Some OSS policies deny stat on missing keys.
+            return None
+        meta = metadata.user_metadata or {}
         return meta.get("sha256") or meta.get("content_sha256")
 
     def write(
@@ -248,15 +246,11 @@ class S3RawStore:
         digest = hashlib.sha256(data).hexdigest()
         key = self._key_for(connector_id, item_id, when=when, kind="raw")
         uri = self._uri_for(key)
-        client = self._get_client()
-        if self._existing_sha256(client, key) == digest:
+        operator = self._get_operator()
+        if self._existing_sha256(operator, key) == digest:
             return digest, uri
-        client.put_object(
-            Bucket=self.bucket,
-            Key=key,
-            Body=data,
-            ContentType="application/json",
-            Metadata={"sha256": digest},
+        operator.write(
+            key, data, content_type="application/json", user_metadata={"sha256": digest}
         )
         return digest, uri
 
@@ -270,14 +264,15 @@ class S3RawStore:
     ) -> str:
         data = _serialize_payload(payload)
         key = self._key_for(connector_id, name, when=when, kind="errors")
-        client = self._get_client()
-        client.put_object(
-            Bucket=self.bucket,
-            Key=key,
-            Body=data,
-            ContentType="application/json",
+        operator = self._get_operator()
+        operator.write(
+            key, data, content_type="application/json",
+            user_metadata={"sha256": hashlib.sha256(data).hexdigest()},
         )
         return self._uri_for(key)
+
+
+OpenDalRawStore = S3RawStore
 
 
 def open_raw_store(root: Path | str | None = None) -> LocalRawStore | S3RawStore:

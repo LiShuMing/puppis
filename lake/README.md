@@ -10,6 +10,8 @@ Evidence store: SQLite + FTS5, local `file://` or S3-compatible raw, pack compil
 | `api.py` | `search` / `get` / `pack` (serve reads only this) |
 | `seed.py` | Fake dogfood data |
 
+S3/OSS raw storage uses Apache OpenDAL Python (`S3RawStore`, alias `OpenDalRawStore`); the existing `EVIDPLANE_S3_*` / `AWS_*` environment variables remain unchanged.
+
 Does **not** call platform APIs. OSS layout + ECS path: `docs/deploy-ecs-oss.md`.
 
 Contracts:

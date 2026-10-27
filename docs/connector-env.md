@@ -11,6 +11,8 @@
 | `EVIDPLANE_S3_*` / `AWS_*` | — | 见 `deploy-ecs-oss.md` |
 | `EVIDPLANE_DB`（别名 `PUPPIS_DB`） | `data/puppis.db` | SQLite 路径；或 Lake API 的 `db_path` 参数 |
 
+S3/OSS raw storage uses Apache OpenDAL Python (`S3RawStore`, alias `OpenDalRawStore`); the existing `EVIDPLANE_S3_*` / `AWS_*` environment variables remain unchanged.
+
 ## Notion（`connectors/notion`）
 
 | 变量 | 必需 | 说明 |

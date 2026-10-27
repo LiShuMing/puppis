@@ -1,5 +1,7 @@
 # Evidplane dogfood — Lake + MCP + Notion ingest
 
+S3/OSS raw storage uses Apache OpenDAL Python (`S3RawStore`, alias `OpenDalRawStore`); the existing `EVIDPLANE_S3_*` / `AWS_*` environment variables remain unchanged.
+
 Brand **Evidplane** · repo `puppis`.
 
 ## Setup

@@ -125,10 +125,12 @@ Agent **不**持有平台 token；不读桶。
 | MCP | `mcp` | ≥1.0 | stdio 先；HTTP 后置 |
 | 校验 | Pydantic | ≥2.0 | Evidence 契约 |
 | HTTP | httpx | ≥0.27 | connectors |
-| 对象存储 | boto3 | ≥1.34 | OSS S3 兼容 / MinIO |
+| 对象存储 | Apache OpenDAL Python | ≥0.47,<0.48 | OSS S3 兼容 / MinIO |
 | 索引 | SQLite FTS5 | 标准库 `sqlite3` | 向量/`sqlite-vec` 后置 |
 | Notion | `notion-client` | 最新稳定 | L0 候选 |
 | Calendar | Google API 或 ICS | — | L0 候选；先通一个 |
+
+S3/OSS raw storage uses Apache OpenDAL Python (`S3RawStore`, alias `OpenDalRawStore`); the existing `EVIDPLANE_S3_*` / `AWS_*` environment variables remain unchanged.
 
 **明确不做：** 双语言栈、Mem0 fork、L0 上向量主路径、Serve 直调平台 API。
 

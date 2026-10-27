@@ -19,7 +19,7 @@
 | 访问 | 私有；阻止公共访问已开启 |
 | 隔离 | **不是** `dbradar-dev`（华北2 北京）。不要在北京再建 Evidplane bucket。 |
 
-- **API**：S3 兼容；客户端用 `boto3` + `endpoint_url`（阿里云 OSS）。
+- **API**：S3 兼容；客户端用 Apache OpenDAL Python + `endpoint`（阿里云 OSS）。
 - **区域**：与 ECS 同区，减少出网；endpoint 为 `https://oss-cn-hangzhou.aliyuncs.com`。
 - **密钥**：RAM 子用户，仅本 bucket 的 `GetObject` / `PutObject` / `HeadObject` / `ListBucket`（前缀限定更好）。密钥只进 ECS 环境变量或实例角色，**不上仓**。
 - **与 dbradar 隔离**：单独 bucket + 单独 RAM 用户/角色；不要复用 Topic Plane 的 AK。
@@ -45,6 +45,8 @@ s3://<bucket>/evidplane/
 | `EVIDPLANE_S3_ACCESS_KEY` / `EVIDPLANE_S3_SECRET_KEY` | 或 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` |
 | `EVIDPLANE_S3_REGION` | 默认 `cn-hangzhou`（或 `AWS_DEFAULT_REGION`） |
 | `EVIDPLANE_S3_PREFIX` | 默认 `evidplane` |
+
+S3/OSS raw storage uses Apache OpenDAL Python (`S3RawStore`, alias `OpenDalRawStore`); the existing `EVIDPLANE_S3_*` / `AWS_*` environment variables remain unchanged.
 
 本地狗粮不设上述变量；raw 落 `~/.evidplane` 或 `EVIDPLANE_RAW_ROOT`。
 
