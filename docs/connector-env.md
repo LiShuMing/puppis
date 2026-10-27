@@ -17,7 +17,10 @@
 |---|---|---|
 | `NOTION_TOKEN` | API 模式 | Internal integration secret |
 | `NOTION_DATABASE_ID` | API（与 PAGE_IDS 二选一） | 指定库 |
-| `NOTION_PAGE_IDS` | API（可选） | 逗号分隔 page id |
+| `NOTION_PAGE_IDS` | API（可选） | 逗号分隔 page id（多页：逐页拉取，单页失败进 `last_errors` / raw `errors/`，不拖垮整批） |
+| `NOTION_HTTP_MAX_RETRIES` | 否 | 429/5xx 在首次之后的重试次数（默认 `4`；总尝试 = 1+该值） |
+| `NOTION_HTTP_RETRY_BASE_SECONDS` | 否 | 指数退避基数秒（默认 `0.5`） |
+| `NOTION_HTTP_RETRY_MAX_SECONDS` | 否 | 退避上限秒（默认 `8`）；若响应带 `Retry-After` 则优先生效 |
 
 离线：
 

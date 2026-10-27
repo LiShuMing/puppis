@@ -266,6 +266,180 @@ def test_local_raw_idempotent_put(tmp: Path) -> dict:
     return {"sha_stable_on_identical": True, "sha_changes_on_update": True}
 
 
+
+def _minimal_page_json(page_id: str, title: str = "Smoke page") -> dict:
+    return {
+        "object": "page",
+        "id": page_id,
+        "created_time": "2026-10-20T02:00:00.000Z",
+        "last_edited_time": "2026-10-25T08:30:00.000Z",
+        "url": f"https://www.notion.so/{page_id.replace('-', '')}",
+        "properties": {
+            "Name": {
+                "id": "title",
+                "type": "title",
+                "title": [
+                    {
+                        "type": "text",
+                        "plain_text": title,
+                        "text": {"content": title},
+                    }
+                ],
+            }
+        },
+    }
+
+
+def _empty_blocks_json() -> dict:
+    return {"object": "list", "results": [], "has_more": False, "next_cursor": None}
+
+
+def test_multipage_fixture() -> dict:
+    connector = NotionConnector(fixture_path=default_fixture_path())
+    records = connector.pull()
+    assert len(records) == 3, f"demo_pull fixture must yield 3 pages, got {len(records)}"
+    assert not connector.last_errors
+    ids = {r.item_id for r in records}
+    assert len(ids) == 3
+    return {"fixture_pages": len(records), "item_ids": sorted(ids)}
+
+
+def test_per_page_isolation_mock() -> dict:
+    """One page 200, one page hard 403 — successes returned, errors in last_errors."""
+    import httpx
+
+    page_ok = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeee1"
+    page_bad = "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeee2"
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(f"{request.method} {request.url.path}")
+        path = request.url.path
+        if path.endswith(f"/pages/{page_ok}"):
+            return httpx.Response(200, json=_minimal_page_json(page_ok, "OK page"))
+        if path.endswith(f"/pages/{page_bad}"):
+            return httpx.Response(403, json={"message": "forbidden"})
+        if "/blocks/" in path and path.endswith("/children"):
+            return httpx.Response(200, json=_empty_blocks_json())
+        return httpx.Response(404, json={"message": "unexpected"})
+
+    sleeps: list[float] = []
+    connector = NotionConnector(
+        token="secret_test_token_not_real",
+        page_ids=[page_ok, page_bad],
+        max_retries=0,  # no retry on 403
+        sleep=lambda d: sleeps.append(d),
+        transport=httpx.MockTransport(handler),
+    )
+    records = connector.pull()
+    assert len(records) == 1, f"expected 1 success, got {len(records)}: {records}"
+    assert records[0].item_id == "notion_pg_aaaaaaaabbbbccccddddeeeeeeeeeee1"
+    assert len(connector.last_errors) == 1
+    err = connector.last_errors[0]
+    assert err.get("status") == 403
+    assert err.get("page_id_last4") == "eee2"
+    # 403 must not burn retries / sleep
+    assert sleeps == []
+    return {
+        "records": len(records),
+        "errors": len(connector.last_errors),
+        "error_status": err.get("status"),
+        "http_calls": len(calls),
+    }
+
+
+def test_retry_on_429_mock() -> dict:
+    """First get_page returns 429 (+ Retry-After), then 200 — pull succeeds after retry."""
+    import httpx
+
+    page_id = "cccccccc-bbbb-cccc-dddd-eeeeeeeeeee3"
+    hits = {"pages": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith(f"/pages/{page_id}"):
+            hits["pages"] += 1
+            if hits["pages"] == 1:
+                return httpx.Response(
+                    429,
+                    headers={"Retry-After": "0"},
+                    json={"message": "rate limited"},
+                )
+            return httpx.Response(200, json=_minimal_page_json(page_id, "After retry"))
+        if "/blocks/" in path and path.endswith("/children"):
+            return httpx.Response(200, json=_empty_blocks_json())
+        return httpx.Response(404, json={"message": "unexpected"})
+
+    sleeps: list[float] = []
+    connector = NotionConnector(
+        token="secret_test_token_not_real",
+        page_ids=[page_id],
+        max_retries=3,
+        retry_base_seconds=0.5,
+        retry_max_seconds=8.0,
+        sleep=lambda d: sleeps.append(d),
+        transport=httpx.MockTransport(handler),
+    )
+    records = connector.pull()
+    assert len(records) == 1, f"expected success after 429 retry, got {records}"
+    assert not connector.last_errors
+    assert hits["pages"] >= 2, f"expected retry, page hits={hits['pages']}"
+    assert connector.last_http_attempts >= 2
+    assert sleeps, "expected sleep on 429 retry"
+    assert sleeps[0] == 0.0, f"Retry-After:0 should yield 0 delay, got {sleeps[0]}"
+    return {
+        "records": len(records),
+        "page_hits": hits["pages"],
+        "http_attempts": connector.last_http_attempts,
+        "sleeps": sleeps,
+    }
+
+
+def test_retry_exhausted_5xx_then_isolate() -> dict:
+    """Page A always 503 → error after retries; page B 200 → still returned."""
+    import httpx
+
+    page_a = "dddddddd-bbbb-cccc-dddd-eeeeeeeeeee4"
+    page_b = "eeeeeeee-bbbb-cccc-dddd-eeeeeeeeeee5"
+    hits_a = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith(f"/pages/{page_a}"):
+            hits_a["n"] += 1
+            return httpx.Response(503, json={"message": "unavailable"})
+        if path.endswith(f"/pages/{page_b}"):
+            return httpx.Response(200, json=_minimal_page_json(page_b, "Survivor"))
+        if "/blocks/" in path and path.endswith("/children"):
+            return httpx.Response(200, json=_empty_blocks_json())
+        return httpx.Response(404, json={"message": "unexpected"})
+
+    sleeps: list[float] = []
+    connector = NotionConnector(
+        token="secret_test_token_not_real",
+        page_ids=[page_a, page_b],
+        max_retries=2,  # 3 total attempts on A
+        retry_base_seconds=0.01,
+        retry_max_seconds=0.05,
+        sleep=lambda d: sleeps.append(d),
+        transport=httpx.MockTransport(handler),
+    )
+    records = connector.pull()
+    assert len(records) == 1
+    assert "Survivor" in (records[0].title or "")
+    assert len(connector.last_errors) == 1
+    assert connector.last_errors[0].get("status") == 503
+    assert hits_a["n"] == 3, f"expected 1+2 retries, got {hits_a['n']}"
+    assert len(sleeps) == 2
+    return {
+        "records": len(records),
+        "errors": len(connector.last_errors),
+        "page_a_hits": hits_a["n"],
+        "sleeps": len(sleeps),
+    }
+
+
+
 def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="evidplane_l0q_"))
     report: dict = {"tmp": str(tmp)}
@@ -289,6 +463,22 @@ def main() -> int:
         print("\n=== 5) search/get/pack + MCP ===")
         report["flow"] = test_search_get_pack_mcp(tmp)
         print(json.dumps(report["flow"], indent=2))
+
+        print("\n=== 6) multipage fixture (3 pages) ===")
+        report["multipage_fixture"] = test_multipage_fixture()
+        print(json.dumps(report["multipage_fixture"], indent=2))
+
+        print("\n=== 7) per-page isolation (mock) ===")
+        report["per_page_isolation"] = test_per_page_isolation_mock()
+        print(json.dumps(report["per_page_isolation"], indent=2))
+
+        print("\n=== 8) retry on 429 (mock) ===")
+        report["retry_429"] = test_retry_on_429_mock()
+        print(json.dumps(report["retry_429"], indent=2))
+
+        print("\n=== 9) 5xx retries then isolate (mock) ===")
+        report["retry_5xx_isolate"] = test_retry_exhausted_5xx_then_isolate()
+        print(json.dumps(report["retry_5xx_isolate"], indent=2))
 
         print("\nSMOKE_L0_QUALITY OK")
         return 0

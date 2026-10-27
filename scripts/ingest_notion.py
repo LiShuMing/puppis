@@ -52,6 +52,28 @@ def _record_error(store, name: str, payload: dict) -> str | None:
         return None
 
 
+def _write_pull_errors(store, errors: list[dict]) -> list[str]:
+    """Persist per-page pull errors to raw errors/. Returns uris written."""
+    uris: list[str] = []
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    for i, err in enumerate(errors):
+        last4 = err.get("page_id_last4") or "unk"
+        name = f"pull_page_{last4}_{ts}_{i}"
+        payload = {
+            "stage": err.get("stage") or "pull_page",
+            "mode": "api",
+            "error": err.get("error"),
+            "message": err.get("message"),
+            "page_id_last4": err.get("page_id_last4"),
+            "page_id_len": err.get("page_id_len"),
+            "status": err.get("status"),
+        }
+        uri = _record_error(store, name, payload)
+        if uri:
+            uris.append(uri)
+    return uris
+
+
 def main() -> int:
     p = argparse.ArgumentParser(
         description="Evidplane: Notion pull → raw → lake (pack-ready)"
@@ -137,6 +159,16 @@ def main() -> int:
             print(f"error_uri: {err_uri}", file=sys.stderr)
         return 1
 
+    pull_errors = list(getattr(connector, "last_errors", None) or [])
+    error_uris: list[str] = []
+    if pull_errors:
+        error_uris = _write_pull_errors(store, pull_errors)
+        print(
+            f"warning: {len(pull_errors)} page-level pull error(s); "
+            f"wrote {len(error_uris)} errors/ object(s)",
+            file=sys.stderr,
+        )
+
     print(f"\n=== pull ({mode}) ===")
     print(
         json.dumps(
@@ -144,11 +176,25 @@ def main() -> int:
                 "count": len(records),
                 "ids": [r.item_id for r in records],
                 "titles": [r.title for r in records],
+                "pull_errors": len(pull_errors),
+                "pull_error_last4s": [e.get("page_id_last4") for e in pull_errors],
+                "error_uri_count": len(error_uris),
             },
             ensure_ascii=False,
             indent=2,
         )
     )
+
+    if not records:
+        if pull_errors:
+            print("pull produced 0 records with page errors", file=sys.stderr)
+            return 1
+        print("pull produced 0 records", file=sys.stderr)
+        # Empty success is allowed (e.g. since filter); still exit 0 unless smoke-pack.
+        if args.smoke_pack:
+            print("SMOKE FAIL: no notion items pulled", file=sys.stderr)
+            return 1
+        return 0
 
     db = args.db or str(default_db_path())
     try:
@@ -157,7 +203,7 @@ def main() -> int:
             raw_store=store,
             source_id="src_notion",
             db_path=db,
-            config={"mode": mode, "since": args.since},
+            config={"mode": mode, "since": args.since, "pull_errors": len(pull_errors)},
         )
     except IngestError as e:
         print(f"ingest failed: {e}", file=sys.stderr)
@@ -178,6 +224,7 @@ def main() -> int:
                 "by_connector": result["by_connector"],
                 "raw_root": result["raw_root"],
                 "raw_uri_count": len(result.get("raw_uris") or []),
+                "pull_errors": len(pull_errors),
             },
             ensure_ascii=False,
             indent=2,

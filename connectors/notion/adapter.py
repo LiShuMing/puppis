@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
@@ -17,9 +19,34 @@ NOTION_API = "https://api.notion.com/v1"
 CONNECTOR_ID = "notion"
 _FIXTURE_PATH = Path(__file__).with_name("demo_pull.json")
 
+# Retries after the first attempt. Total attempts = 1 + max_retries.
+_DEFAULT_MAX_RETRIES = 4
+_DEFAULT_RETRY_BASE = 0.5
+_DEFAULT_RETRY_MAX = 8.0
+
 
 class NotionConfigError(RuntimeError):
     """Raised when required Notion env/config is missing or invalid."""
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return int(str(raw).strip())
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return float(str(raw).strip())
+    except ValueError:
+        return default
 
 
 def _parse_since(since: datetime | None) -> datetime | None:
@@ -171,6 +198,15 @@ def _records_from_payload(
     return out
 
 
+def _sanitize_page_id(page_id: str) -> str:
+    return re.sub(r"[^0-9a-fA-F-]", "", page_id)
+
+
+def _page_id_last4(page_id: str) -> str:
+    clean = str(page_id).replace("-", "")
+    return clean[-4:] if len(clean) >= 4 else clean
+
+
 class NotionConnector:
     """pull(since) from Notion API or a local fixture JSON."""
 
@@ -184,6 +220,11 @@ class NotionConnector:
         page_ids: list[str] | None = None,
         fixture_path: str | Path | None = None,
         timeout: float = 30.0,
+        max_retries: int | None = None,
+        retry_base_seconds: float | None = None,
+        retry_max_seconds: float | None = None,
+        sleep: Callable[[float], None] | None = None,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self._fixture_path = Path(fixture_path) if fixture_path else None
         self._token = token if token is not None else os.environ.get("NOTION_TOKEN")
@@ -198,6 +239,28 @@ class NotionConnector:
             raw_ids = os.environ.get("NOTION_PAGE_IDS", "").strip()
             self._page_ids = [p.strip() for p in raw_ids.split(",") if p.strip()]
         self._timeout = timeout
+        self._max_retries = (
+            max_retries
+            if max_retries is not None
+            else _env_int("NOTION_HTTP_MAX_RETRIES", _DEFAULT_MAX_RETRIES)
+        )
+        self._retry_base = (
+            retry_base_seconds
+            if retry_base_seconds is not None
+            else _env_float("NOTION_HTTP_RETRY_BASE_SECONDS", _DEFAULT_RETRY_BASE)
+        )
+        self._retry_max = (
+            retry_max_seconds
+            if retry_max_seconds is not None
+            else _env_float("NOTION_HTTP_RETRY_MAX_SECONDS", _DEFAULT_RETRY_MAX)
+        )
+        self._sleep: Callable[[float], None] = sleep if sleep is not None else time.sleep
+        self._transport = transport
+        # Cleared at the start of each pull(); structured, no secrets.
+        self.last_errors: list[dict[str, Any]] = []
+        # Observability for smoke (does not include secrets).
+        self.last_http_attempts: int = 0
+        self.last_retry_sleeps: list[float] = []
 
     def health(self) -> dict[str, Any]:
         if self._fixture_path is not None:
@@ -216,9 +279,15 @@ class NotionConnector:
             "has_token": has_token,
             "has_database_id": bool(self._database_id),
             "page_id_count": len(self._page_ids),
+            "http_max_retries": self._max_retries,
+            "http_retry_base_seconds": self._retry_base,
+            "http_retry_max_seconds": self._retry_max,
         }
 
     def pull(self, since: datetime | None = None) -> list[PullRecord]:
+        self.last_errors = []
+        self.last_http_attempts = 0
+        self.last_retry_sleeps = []
         if self._fixture_path is not None:
             return self._pull_fixture(since)
         self._require_api_config()
@@ -256,16 +325,148 @@ class NotionConnector:
             "Content-Type": "application/json",
         }
 
+    def _client_kwargs(self) -> dict[str, Any]:
+        kw: dict[str, Any] = {
+            "timeout": self._timeout,
+            "headers": self._headers(),
+        }
+        if self._transport is not None:
+            kw["transport"] = self._transport
+        return kw
+
+    def _retry_delay(self, attempt: int, response: httpx.Response | None) -> float:
+        """Backoff seconds before the next attempt (attempt is 0-indexed failed try)."""
+        if response is not None:
+            ra = response.headers.get("Retry-After")
+            if ra is not None:
+                try:
+                    return max(0.0, float(ra))
+                except ValueError:
+                    pass
+        # Exponential: base * 2^attempt, capped, light jitter.
+        delay = min(self._retry_max, self._retry_base * (2**attempt))
+        jitter = delay * 0.1 * random.random()
+        return min(self._retry_max, delay + jitter)
+
+    def _request(
+        self,
+        client: httpx.Client,
+        method: str,
+        url: str,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """HTTP with retries on 429 / 5xx and transport errors.
+
+        ``NOTION_HTTP_MAX_RETRIES`` = retries *after* the first attempt
+        (total attempts = 1 + max_retries). Never logs headers/token.
+        """
+        last_exc: Exception | None = None
+        last_resp: httpx.Response | None = None
+        attempts = self._max_retries + 1
+        for attempt in range(attempts):
+            self.last_http_attempts += 1
+            try:
+                resp = client.request(method, url, **kwargs)
+            except httpx.TransportError as exc:
+                last_exc = exc
+                if attempt >= self._max_retries:
+                    break
+                delay = self._retry_delay(attempt, None)
+                self.last_retry_sleeps.append(delay)
+                self._sleep(delay)
+                continue
+
+            if resp.status_code == 429 or resp.status_code >= 500:
+                last_resp = resp
+                if attempt >= self._max_retries:
+                    resp.raise_for_status()
+                    return resp  # pragma: no cover — raise_for_status always raises
+                delay = self._retry_delay(attempt, resp)
+                self.last_retry_sleeps.append(delay)
+                self._sleep(delay)
+                continue
+
+            return resp
+
+        if last_resp is not None:
+            last_resp.raise_for_status()
+        assert last_exc is not None
+        raise last_exc
+
+    def _record_page_error(
+        self,
+        *,
+        page_id: str,
+        stage: str,
+        error: str,
+        message: str,
+        status: int | None = None,
+    ) -> None:
+        entry: dict[str, Any] = {
+            "stage": stage,
+            "page_id_last4": _page_id_last4(page_id),
+            "page_id_len": len(str(page_id).replace("-", "")),
+            "error": error,
+            "message": message[:500],
+        }
+        # Keep a sanitized id form for smoke asserts (no token).
+        entry["page_id"] = _sanitize_page_id(page_id)
+        if status is not None:
+            entry["status"] = status
+        self.last_errors.append(entry)
+
     def _pull_api(self, since: datetime | None) -> list[PullRecord]:
         pages: list[dict[str, Any]] = []
-        with httpx.Client(timeout=self._timeout, headers=self._headers()) as client:
+        with httpx.Client(**self._client_kwargs()) as client:
             if self._database_id:
-                pages.extend(self._query_database(client, self._database_id, since))
+                try:
+                    pages.extend(self._query_database(client, self._database_id, since))
+                except Exception as exc:
+                    # DB query is a hard failure for that source; record + re-raise
+                    # so callers without page_ids still see a failed pull.
+                    self._record_page_error(
+                        page_id=self._database_id,
+                        stage="database_query",
+                        error=type(exc).__name__,
+                        message=str(exc),
+                    )
+                    if not self._page_ids:
+                        raise
+                    # With page_ids present, continue pages; DB miss is in last_errors.
+
             for pid in self._page_ids:
-                page = self._get_page(client, pid)
-                if page:
-                    pages.append(page)
-            # Dedupe by id
+                try:
+                    page = self._get_page(client, pid)
+                    if page is None:
+                        self._record_page_error(
+                            page_id=pid,
+                            stage="get_page",
+                            error="NotFound",
+                            message="page not found (404)",
+                            status=404,
+                        )
+                        continue
+                    block_id = str(page.get("id") or pid)
+                    blocks = self._list_blocks(client, block_id)
+                    pages.append({**page, "_blocks": blocks})
+                except httpx.HTTPStatusError as exc:
+                    status = exc.response.status_code if exc.response is not None else None
+                    self._record_page_error(
+                        page_id=pid,
+                        stage="get_page",
+                        error="HTTPStatusError",
+                        message=str(exc),
+                        status=status,
+                    )
+                except Exception as exc:
+                    self._record_page_error(
+                        page_id=pid,
+                        stage="get_page",
+                        error=type(exc).__name__,
+                        message=str(exc),
+                    )
+
+            # Dedupe by id; enrich blocks for database rows that lack _blocks.
             by_id: dict[str, dict[str, Any]] = {}
             for p in pages:
                 pid = str(p.get("id") or "")
@@ -273,10 +474,20 @@ class NotionConnector:
                     by_id[pid] = p
             enriched: list[dict[str, Any]] = []
             for p in by_id.values():
+                if "_blocks" in p:
+                    enriched.append(p)
+                    continue
                 pid = str(p["id"])
-                blocks = self._list_blocks(client, pid)
-                p = {**p, "_blocks": blocks}
-                enriched.append(p)
+                try:
+                    blocks = self._list_blocks(client, pid)
+                    enriched.append({**p, "_blocks": blocks})
+                except Exception as exc:
+                    self._record_page_error(
+                        page_id=pid,
+                        stage="list_blocks",
+                        error=type(exc).__name__,
+                        message=str(exc),
+                    )
         return _records_from_payload(enriched, since=since)
 
     def _query_database(
@@ -300,7 +511,9 @@ class NotionConnector:
             payload = dict(body)
             if cursor:
                 payload["start_cursor"] = cursor
-            r = client.post(f"{NOTION_API}/databases/{database_id}/query", json=payload)
+            r = self._request(
+                client, "POST", f"{NOTION_API}/databases/{database_id}/query", json=payload
+            )
             r.raise_for_status()
             data = r.json()
             for row in data.get("results") or []:
@@ -314,8 +527,8 @@ class NotionConnector:
         return results
 
     def _get_page(self, client: httpx.Client, page_id: str) -> dict[str, Any] | None:
-        pid = re.sub(r"[^0-9a-fA-F-]", "", page_id)
-        r = client.get(f"{NOTION_API}/pages/{pid}")
+        pid = _sanitize_page_id(page_id)
+        r = self._request(client, "GET", f"{NOTION_API}/pages/{pid}")
         if r.status_code == 404:
             return None
         r.raise_for_status()
@@ -329,7 +542,9 @@ class NotionConnector:
             params: dict[str, Any] = {"page_size": 100}
             if cursor:
                 params["start_cursor"] = cursor
-            r = client.get(f"{NOTION_API}/blocks/{block_id}/children", params=params)
+            r = self._request(
+                client, "GET", f"{NOTION_API}/blocks/{block_id}/children", params=params
+            )
             r.raise_for_status()
             data = r.json()
             for row in data.get("results") or []:
