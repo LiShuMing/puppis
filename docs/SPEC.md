@@ -13,6 +13,8 @@
 
 2026-10-28 增量范围：负责人已确认 [SPEC-0003](specs/0003-local-product-platform.md)，新增本机单用户 Web 工作台，复用三层数据面；授权入口与验收见该 spec。以下 L0 历史边界中的 UI 非目标不再排除这一已确认的本地界面；公网/多租户仍不在范围。
 
+下一阶段的候选目标、LLM/Agent 复用和验收路线见 [技术路线草案](TECHNICAL_ROADMAP.md) / [SPEC-0004](specs/0004-evidence-intelligence-roadmap.md)；阶段实施仍需确认，不自动扩展本 SPEC 的已批准范围。
+
 ---
 
 ## 1. 产品一句话

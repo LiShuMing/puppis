@@ -2,6 +2,8 @@
 
 日期：2026-10-28，初评基线 `b69f82f`，当前架构纳入已确认的 SPEC-0003 本机平台。本文件区分当前实现与目标；产品范围见 [SPEC](SPEC.md)，初始缺口与处理见 [评审](reviews/2026-10-28-project-review.md)。
 
+后续目标架构见 [技术路线草案](TECHNICAL_ROADMAP.md) / [SPEC-0004](specs/0004-evidence-intelligence-roadmap.md)。新模型/工作流模块尚待确认实施，本文件继续记录当前已交付边界。
+
 ## 1. 数据流与依赖方向
 
 ```text

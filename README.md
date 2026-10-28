@@ -22,6 +22,9 @@ Start with [AGENTS.md](AGENTS.md), [architecture](docs/ARCHITECTURE.md), and the
 [development workflow](docs/DEVELOPMENT.md). Changes follow **spec → owner confirmation
 → implementation → acceptance checks**; use the [spec index and template](docs/specs/README.md).
 The [project review](docs/reviews/2026-10-28-project-review.md) records current gaps.
+The [technical roadmap](docs/TECHNICAL_ROADMAP.md) proposes versioned evidence,
+context compilation, and bounded Agent workflows; [SPEC-0004](docs/specs/0004-evidence-intelligence-roadmap.md)
+is a design draft pending implementation approval.
 Run smoke scripts with isolated DB/raw paths as described in the workflow: some seed
 scripts replace existing database contents.
 
