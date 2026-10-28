@@ -9,6 +9,10 @@
 
 相关：`PRD`/`UI`/`TECH` 合稿见全员讨论；本 SPEC 只钉**可实现边界与复用清单**。
 
+开发入口：[AGENTS.md](../AGENTS.md) · [当前架构](ARCHITECTURE.md) · [Spec 先行流程](DEVELOPMENT.md) · [变更规格索引](specs/README.md)。本文记录产品目标，不代表各项均已实现；现状与缺口见 [整体评审](reviews/2026-10-28-project-review.md)。
+
+2026-10-28 增量范围：负责人已确认 [SPEC-0003](specs/0003-local-product-platform.md)，新增本机单用户 Web 工作台，复用三层数据面；授权入口与验收见该 spec。以下 L0 历史边界中的 UI 非目标不再排除这一已确认的本地界面；公网/多租户仍不在范围。
+
 ---
 
 ## 1. 产品一句话
@@ -79,7 +83,7 @@ OSS 布局：
 ```
 s3://<bucket>/evidplane/
   sources/<connector_id>/
-    raw/<yyyy>/<mm>/<item_id>.json
+    raw/<yyyy>/<mm>/<sha256(item_id)>/<content_sha256>.json
     errors/<yyyy>/<mm>/...
   derived/
     episodes/  facts/   # 可删可重建
@@ -122,7 +126,7 @@ Agent **不**持有平台 token；不读桶。
 | 层 | 选择 | 版本钉（下限） | 备注 |
 |---|---|---|---|
 | 语言 | Python | ≥3.12 | 单仓三包；热点后再换 Go/Rust 同契约 |
-| MCP | `mcp` | ≥1.0 | stdio 先；HTTP 后置 |
+| MCP | `mcp` | ≥2.3,<3 | stdio；本机 Console HTTP 是独立产品入口 |
 | 校验 | Pydantic | ≥2.0 | Evidence 契约 |
 | HTTP | httpx | ≥0.27 | connectors |
 | 对象存储 | Apache OpenDAL Python | ≥0.47,<0.48 | OSS S3 兼容 / MinIO |
@@ -205,4 +209,4 @@ puppis/
 
 ---
 
-*变更：只改本 SPEC；实现 PR 对这一节做 diff 说明。*
+*变更：产品边界变化更新本 SPEC；每次功能、修复、重构与工程配置变更先在 `docs/specs/` 确定规格并记录负责人确认，再实施与验收。实现 PR 关联对应 spec 和验证证据，详见 `docs/DEVELOPMENT.md`。*

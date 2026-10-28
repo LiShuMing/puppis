@@ -148,7 +148,7 @@ def _item_id_for_page(page_id: str) -> str:
     return f"notion_pg_{clean}"
 
 
-def _records_from_payload(
+def records_from_payload(
     pages: list[dict[str, Any]],
     *,
     since: datetime | None,
@@ -314,7 +314,7 @@ class NotionConnector:
         pages = data.get("pages") if isinstance(data, dict) else data
         if not isinstance(pages, list):
             raise NotionConfigError("Fixture must be {pages:[…]} or a list of pages")
-        return _records_from_payload(pages, since=since)
+        return records_from_payload(pages, since=since)
 
     def _headers(self) -> dict[str, str]:
         # Never log this dict.
@@ -435,6 +435,7 @@ class NotionConnector:
                     # With page_ids present, continue pages; DB miss is in last_errors.
 
             for pid in self._page_ids:
+                stage = "get_page"
                 try:
                     page = self._get_page(client, pid)
                     if page is None:
@@ -447,13 +448,14 @@ class NotionConnector:
                         )
                         continue
                     block_id = str(page.get("id") or pid)
+                    stage = "list_blocks"
                     blocks = self._list_blocks(client, block_id)
                     pages.append({**page, "_blocks": blocks})
                 except httpx.HTTPStatusError as exc:
                     status = exc.response.status_code if exc.response is not None else None
                     self._record_page_error(
                         page_id=pid,
-                        stage="get_page",
+                        stage=stage,
                         error="HTTPStatusError",
                         message=str(exc),
                         status=status,
@@ -461,7 +463,7 @@ class NotionConnector:
                 except Exception as exc:
                     self._record_page_error(
                         page_id=pid,
-                        stage="get_page",
+                        stage=stage,
                         error=type(exc).__name__,
                         message=str(exc),
                     )
@@ -488,7 +490,7 @@ class NotionConnector:
                         error=type(exc).__name__,
                         message=str(exc),
                     )
-        return _records_from_payload(enriched, since=since)
+        return records_from_payload(enriched, since=since)
 
     def _query_database(
         self,
@@ -550,12 +552,9 @@ class NotionConnector:
             for row in data.get("results") or []:
                 if isinstance(row, dict):
                     results.append(row)
-                    # One level of children for nested blocks (lightweight L0).
+                    # Capture nested children; a failed subtree fails this page.
                     if row.get("has_children") and row.get("id"):
-                        try:
-                            results.extend(self._list_blocks(client, str(row["id"])))
-                        except httpx.HTTPError:
-                            pass
+                        results.extend(self._list_blocks(client, str(row["id"])))
             if not data.get("has_more"):
                 break
             cursor = data.get("next_cursor")

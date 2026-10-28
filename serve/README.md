@@ -1,6 +1,7 @@
 # serve
 
-MCP tools only: `search`, `get`, `pack` (+ `list_connectors` stub).
+MCP tools only: `search`, `get`, `pack`, `list_connectors` (actual ingested sources).
+Empty databases stay empty; demo import is explicit in the local Console.
 
 ```bash
 PYTHONPATH=. python -m serve.mcp_server

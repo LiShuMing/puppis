@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -27,7 +28,13 @@ def _serialize_payload(payload: dict[str, Any] | bytes | str) -> bytes:
 
 
 def _safe_item_id(item_id: str) -> str:
-    return item_id.replace("/", "_")
+    return hashlib.sha256(item_id.encode("utf-8")).hexdigest()
+
+
+def _safe_component(value: str) -> str:
+    if not value or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for ch in value):
+        raise ValueError("invalid storage component")
+    return value
 
 
 def _yyyy_mm(when: datetime | None) -> tuple[str, str, datetime]:
@@ -66,10 +73,10 @@ class RawStore(Protocol):
 
 
 class LocalRawStore:
-    """Write immutable raw JSON under sources/<connector>/raw/yyyy/mm/<item_id>.json."""
+    """Publish content-addressed raw JSON without replacing existing versions."""
 
     def __init__(self, root: Path | str | None = None) -> None:
-        self.root = Path(root) if root else default_raw_root()
+        self.root = Path(root).expanduser().resolve() if root else default_raw_root()
 
     def path_for(
         self,
@@ -77,16 +84,18 @@ class LocalRawStore:
         item_id: str,
         *,
         when: datetime | None = None,
+        digest: str,
     ) -> Path:
         yyyy, mm, _when = _yyyy_mm(when)
         return (
             self.root
             / "sources"
-            / connector_id
+            / _safe_component(connector_id)
             / "raw"
             / yyyy
             / mm
-            / f"{_safe_item_id(item_id)}.json"
+            / _safe_item_id(item_id)
+            / f"{digest}.json"
         )
 
     def write(
@@ -97,16 +106,28 @@ class LocalRawStore:
         *,
         when: datetime | None = None,
     ) -> tuple[str, str]:
-        """Serialize payload, write once, return (content_sha256, file:// uri)."""
+        """Atomically publish complete bytes, never replace an existing version."""
         data = _serialize_payload(payload)
         digest = hashlib.sha256(data).hexdigest()
-        path = self.path_for(connector_id, item_id, when=when)
+        path = self.path_for(connector_id, item_id, when=when, digest=digest)
         path.parent.mkdir(parents=True, exist_ok=True)
-        if path.is_file():
-            existing = path.read_bytes()
-            if hashlib.sha256(existing).hexdigest() == digest:
-                return digest, path.as_uri()
-        path.write_bytes(data)
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as temp:
+            temp_path = Path(temp.name)
+            try:
+                temp.write(data)
+                temp.flush()
+                os.fsync(temp.fileno())
+            except BaseException:
+                temp_path.unlink(missing_ok=True)
+                raise
+        try:
+            try:
+                os.link(temp_path, path)
+            except FileExistsError:
+                if path.read_bytes() != data:
+                    raise ValueError("existing raw object failed content verification")
+        finally:
+            temp_path.unlink(missing_ok=True)
         return digest, path.as_uri()
 
     def write_error(
@@ -121,11 +142,11 @@ class LocalRawStore:
         path = (
             self.root
             / "sources"
-            / connector_id
+            / _safe_component(connector_id)
             / "errors"
             / yyyy
             / mm
-            / f"{name}.json"
+            / f"{_safe_component(name)}.json"
         )
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
@@ -214,25 +235,14 @@ class S3RawStore:
         *,
         when: datetime | None = None,
         kind: str = "raw",
+        digest: str | None = None,
     ) -> str:
         yyyy, mm, _when = _yyyy_mm(when)
-        safe = _safe_item_id(item_id) if kind == "raw" else item_id
-        return f"{self.prefix}/sources/{connector_id}/{kind}/{yyyy}/{mm}/{safe}.json"
+        safe = f"{_safe_item_id(item_id)}/{digest}" if kind == "raw" else _safe_component(item_id)
+        return f"{self.prefix}/sources/{_safe_component(connector_id)}/{kind}/{yyyy}/{mm}/{safe}.json"
 
     def _uri_for(self, key: str) -> str:
         return f"s3://{self.bucket}/{key}"
-
-    def _existing_sha256(self, operator: Any, key: str) -> str | None:
-        """Return sha256 metadata, treating missing or forbidden stat as a miss."""
-        from opendal.exceptions import NotFound, PermissionDenied
-
-        try:
-            metadata = operator.stat(key)
-        except (NotFound, PermissionDenied):
-            # Some OSS policies deny stat on missing keys.
-            return None
-        meta = metadata.user_metadata or {}
-        return meta.get("sha256") or meta.get("content_sha256")
 
     def write(
         self,
@@ -244,14 +254,20 @@ class S3RawStore:
     ) -> tuple[str, str]:
         data = _serialize_payload(payload)
         digest = hashlib.sha256(data).hexdigest()
-        key = self._key_for(connector_id, item_id, when=when, kind="raw")
+        key = self._key_for(connector_id, item_id, when=when, kind="raw", digest=digest)
         uri = self._uri_for(key)
         operator = self._get_operator()
-        if self._existing_sha256(operator, key) == digest:
-            return digest, uri
-        operator.write(
-            key, data, content_type="application/json", user_metadata={"sha256": digest}
-        )
+        from opendal.exceptions import AlreadyExists, ConditionNotMatch
+
+        try:
+            operator.write(
+                key, data, content_type="application/json",
+                user_metadata={"sha256": digest}, if_not_exists=True,
+            )
+        except (AlreadyExists, ConditionNotMatch):
+            if operator.read(key) != data:
+                raise ValueError("existing raw object failed content verification")
+        # Unsupported conditional writes fail closed; no overwrite fallback.
         return digest, uri
 
     def write_error(

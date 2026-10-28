@@ -17,11 +17,10 @@ if str(_ROOT) not in sys.path:
 
 from mcp.server.mcpserver import MCPServer
 
-from lake.db import connect, default_db_path, init_db, item_count
 from lake.query import get as lake_get
 from lake.query import pack as lake_pack
 from lake.query import search as lake_search
-from lake.seed import seed_fake
+from lake.query import overview
 
 server = MCPServer(
     name="evidplane",
@@ -33,18 +32,6 @@ server = MCPServer(
         "Do not invent item_ids — only cite ids returned by these tools."
     ),
 )
-
-
-def _ensure_seeded() -> None:
-    """Auto-seed fake Evidence once so Cursor dogfood works out of the box."""
-    path = default_db_path()
-    conn = connect(path)
-    try:
-        init_db(conn)
-        if item_count(conn) == 0:
-            seed_fake(path)
-    finally:
-        conn.close()
 
 
 def _json(data: Any) -> str:
@@ -64,7 +51,6 @@ def search(
     since_days: int | None = None,
     limit: int | None = 20,
 ) -> str:
-    _ensure_seeded()
     return _json(
         lake_search(q=q, source=source, since_days=since_days, limit=limit)
     )
@@ -75,7 +61,6 @@ def search(
     description="Fetch one Evidence item by item_id (full text + source_url + provenance).",
 )
 def get(item_id: str) -> str:
-    _ensure_seeded()
     return _json(lake_get(item_id))
 
 
@@ -91,7 +76,6 @@ def pack(
     budget_tokens: int | None = 3000,
     since_days: int | None = 7,
 ) -> str:
-    _ensure_seeded()
     return _json(
         lake_pack(
             template=template,
@@ -103,35 +87,13 @@ def pack(
 
 @server.tool(
     name="list_connectors",
-    description="List configured connectors (stub until real OAuth sources land).",
+    description="List sources actually ingested into the local Evidence library.",
 )
 def list_connectors() -> str:
-    _ensure_seeded()
-    return _json(
-        {
-            "connectors": [
-                {
-                    "connector_id": "google_calendar",
-                    "status": "fake_seed",
-                    "note": "L0 dogfood seed only",
-                },
-                {
-                    "connector_id": "notion",
-                    "status": "ingest_ready",
-                    "note": "scripts/ingest_notion.py (--fixture or NOTION_TOKEN)",
-                },
-                {
-                    "connector_id": "github",
-                    "status": "fake_seed",
-                    "note": "PR-like seed items; real connector Phase 1+",
-                },
-            ]
-        }
-    )
+    return _json({"connectors": overview()["sources"]})
 
 
 def main() -> None:
-    _ensure_seeded()
     server.run(transport="stdio")
 
 

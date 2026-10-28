@@ -29,6 +29,13 @@ def init_db(conn: sqlite3.Connection) -> None:
     """Apply lake/schema.sql (items + FTS5 external-content + sync triggers)."""
     sql = _SCHEMA_PATH.read_text(encoding="utf-8")
     conn.executescript(sql)
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(items)")}
+    for name, definition in {
+        "provenance_json": "TEXT", "valid_from": "TEXT", "valid_to": "TEXT",
+        "content_sha256": "TEXT", "raw_uri": "TEXT",
+    }.items():
+        if name not in columns:
+            conn.execute(f"ALTER TABLE items ADD COLUMN {name} {definition}")
     conn.commit()
 
 

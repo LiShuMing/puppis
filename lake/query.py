@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -59,7 +60,14 @@ def _row_to_meta(row: sqlite3.Row) -> dict[str, Any]:
         "captured_at": row["captured_at"],
         "trust_level": row["trust_level"],
         "provenance": row["provenance"],
+        "demo": bool(_provenance(row).get("demo", False)),
     }
+
+
+def _provenance(row: sqlite3.Row) -> dict[str, Any]:
+    if "provenance_json" in row.keys() and row["provenance_json"]:
+        return json.loads(row["provenance_json"])
+    return {"source": row["provenance"], "human_reviewed": False}
 
 
 def _fts_query(q: str) -> str:
@@ -76,6 +84,7 @@ def search(
     limit: int | None = None,
     *,
     db_path: str | None = None,
+    offset: int = 0,
 ) -> dict[str, Any]:
     """Metadata-first search (FTS5 when q set)."""
     conn = _ensure_db(db_path)
@@ -89,37 +98,30 @@ def search(
             where.append("i.connector_id = ?")
             params.append(source)
 
-        fetch_lim = lim * 3 if cutoff else lim
-        if q and q.strip():
-            sql = f"""
-                SELECT i.item_id, i.connector_id, i.kind, i.title, i.source_url,
-                       i.captured_at, i.trust_level, i.provenance
-                FROM items_fts
-                JOIN items i ON i.rowid = items_fts.rowid
-                WHERE {" AND ".join(where)}
-                  AND items_fts MATCH ?
-                ORDER BY i.captured_at DESC
-                LIMIT ?
-            """
-            params.extend([_fts_query(q), fetch_lim])
-            rows = conn.execute(sql, params).fetchall()
-        else:
-            sql = f"""
-                SELECT i.item_id, i.connector_id, i.kind, i.title, i.source_url,
-                       i.captured_at, i.trust_level, i.provenance
-                FROM items i
-                WHERE {" AND ".join(where)}
-                ORDER BY i.captured_at DESC
-                LIMIT ?
-            """
-            params.append(fetch_lim)
-            rows = conn.execute(sql, params).fetchall()
-
-        items = [_row_to_meta(r) for r in rows]
         if cutoff is not None:
-            items = [it for it in items if _parse_ts(it["captured_at"]) >= cutoff]
-        items = items[:lim]
-        return {"items": items, "count": len(items)}
+            where.append("julianday(i.captured_at) >= julianday(?)")
+            params.append(cutoff.isoformat())
+
+        table = "items i"
+        if q and re.search(r"[\u3400-\u9fff]", q):
+            # unicode61 has no CJK word segmentation. Substring matching keeps
+            # Chinese notes searchable without an extra tokenizer dependency.
+            for term in q.split():
+                term = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                where.append("(i.title LIKE ? ESCAPE '\\' OR i.body LIKE ? ESCAPE '\\')")
+                params.extend([f"%{term}%", f"%{term}%"])
+        elif q and q.strip():
+            table = "items_fts JOIN items i ON i.rowid = items_fts.rowid"
+            where.append("items_fts MATCH ?")
+            params.append(_fts_query(q))
+        condition = " AND ".join(where)
+        total = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE {condition}", params).fetchone()[0]
+        rows = conn.execute(
+            f"SELECT i.* FROM {table} WHERE {condition} ORDER BY julianday(i.captured_at) DESC, i.item_id LIMIT ? OFFSET ?",
+            [*params, lim, max(0, int(offset))],
+        ).fetchall()
+        items = [_row_to_meta(row) for row in rows]
+        return {"items": items, "count": len(items), "total": total, "has_more": max(0, offset) + len(items) < total}
     finally:
         conn.close()
 
@@ -130,8 +132,7 @@ def get(item_id: str, *, db_path: str | None = None) -> dict[str, Any]:
     try:
         row = conn.execute(
             """
-            SELECT item_id, connector_id, kind, title, body, source_url,
-                   captured_at, ingested_at, trust_level, provenance, tombstone
+            SELECT *
             FROM items WHERE item_id = ?
             """,
             (item_id,),
@@ -151,10 +152,11 @@ def get(item_id: str, *, db_path: str | None = None) -> dict[str, Any]:
             "captured_at": row["captured_at"],
             "ingested_at": row["ingested_at"],
             "trust_level": row["trust_level"],
-            "provenance": {
-                "source": row["provenance"],
-                "human_reviewed": False,
-            },
+            "provenance": _provenance(row),
+            "valid_from": row["valid_from"],
+            "valid_to": row["valid_to"],
+            "content_sha256": row["content_sha256"],
+            "raw_uri": row["raw_uri"],
         }
     finally:
         conn.close()
@@ -193,13 +195,12 @@ def pack_work(
         cutoff = _since_cutoff(days)
         rows = conn.execute(
             """
-            SELECT item_id, connector_id, kind, title, body, source_url,
-                   captured_at, trust_level, provenance
+            SELECT *
             FROM items
-            WHERE tombstone = 0
-            ORDER BY captured_at DESC
+            WHERE tombstone = 0 AND julianday(captured_at) >= julianday(?)
+            ORDER BY julianday(captured_at) DESC, item_id
             LIMIT 50
-            """
+            """, (cutoff.isoformat(),)
         ).fetchall()
 
         selected: list[dict[str, Any]] = []
@@ -249,6 +250,7 @@ def pack_work(
                     "url": row["source_url"],
                     "connector_id": row["connector_id"],
                     "captured_at": row["captured_at"],
+                    "demo": bool(_provenance(row).get("demo", False)),
                 }
             )
 
@@ -300,3 +302,24 @@ def pack(
         since_days=int(since_days) if since_days is not None else _DEFAULT_PACK_DAYS,
         db_path=db_path,
     )
+
+
+def overview(*, db_path: str | None = None) -> dict[str, Any]:
+    """Local library statistics and actual ingested source states."""
+    conn = _ensure_db(db_path)
+    try:
+        sources = [dict(row) for row in conn.execute(
+            """SELECT s.source_id, s.connector_id, s.status, s.updated_at,
+                      COUNT(i.item_id) AS item_count
+               FROM sources s LEFT JOIN items i ON i.source_id=s.source_id AND i.tombstone=0
+               GROUP BY s.source_id ORDER BY s.updated_at DESC"""
+        )]
+        total, latest = conn.execute(
+            "SELECT COUNT(*), MAX(ingested_at) FROM items WHERE tombstone=0"
+        ).fetchone()
+        demo = sum(bool(_provenance(row).get("demo")) for row in conn.execute(
+            "SELECT provenance, provenance_json FROM items WHERE tombstone=0"
+        ))
+        return {"total": total, "demo_count": demo, "source_count": len(sources), "last_ingested_at": latest, "sources": sources}
+    finally:
+        conn.close()

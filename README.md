@@ -4,7 +4,26 @@ Personal **Evidence lake + MCP** for coding agents: authorized sources → self-
 
 - Brand: **Evidplane** · Domain: `evidplane.com` (pending) · Repo codename: `puppis`
 - Spec: [docs/SPEC.md](docs/SPEC.md) · Dogfood: [docs/dogfood.md](docs/dogfood.md)
-- Modules: `connectors/` · `lake/` · `serve/` (no cross-layer calls)
+- Modules: `connectors/` · `lake/` · `serve/` (explicit dependency boundaries)
+
+## Local workspace
+
+```bash
+.venv/bin/python scripts/workspace.py start
+```
+
+Open [Evidplane](http://127.0.0.1:8765): import notes or JSON, search evidence,
+inspect sources, and build context packs with citations. MCP shares the same library.
+See [local setup, backup and usage](docs/LOCAL_PLATFORM.md).
+
+## Development
+
+Start with [AGENTS.md](AGENTS.md), [architecture](docs/ARCHITECTURE.md), and the
+[development workflow](docs/DEVELOPMENT.md). Changes follow **spec → owner confirmation
+→ implementation → acceptance checks**; use the [spec index and template](docs/specs/README.md).
+The [project review](docs/reviews/2026-10-28-project-review.md) records current gaps.
+Run smoke scripts with isolated DB/raw paths as described in the workflow: some seed
+scripts replace existing database contents.
 
 ## Install
 
@@ -59,6 +78,7 @@ Or without install entry point:
 
 Tools: `search`, `get`, `pack` (`template=work`), `list_connectors`.
 
-First launch auto-seeds fake calendar/notion/github Evidence if the DB is empty.
+An empty database stays empty. Import explicitly marked demo data from the local
+workspace, or use `python -m lake.seed` with an isolated database for development.
 
 Private until dogfood.

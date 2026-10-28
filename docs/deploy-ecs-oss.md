@@ -29,7 +29,7 @@
 ```
 s3://<bucket>/evidplane/
   sources/<connector_id>/
-    raw/<yyyy>/<mm>/<item_id>.json
+    raw/<yyyy>/<mm>/<sha256(item_id)>/<content_sha256>.json
     errors/<yyyy>/<mm>/<name>.json
   derived/          # 可删可重建（后置）
   export/           # 后置

@@ -247,6 +247,11 @@ def seed_fake(db_path: str | Path | None = None, *, force: bool = False) -> dict
                 ),
             )
             n += 1
+        conn.execute(
+            """UPDATE items SET provenance='export', provenance_json=?
+               WHERE source_id IN ('src_calendar_dogfood', 'src_notion_dogfood', 'src_github_dogfood')""",
+            ('{"source":"export","human_reviewed":false,"demo":true}',),
+        )
         conn.commit()
         return {"db": str(path), "seeded": n, "existing": existing, "skipped": False}
     finally:

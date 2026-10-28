@@ -113,7 +113,7 @@ def _event_to_record(event: dict[str, Any]) -> PullRecord:
     )
 
 
-def _records_from_events(
+def records_from_events(
     events: list[dict[str, Any]],
     *,
     since: datetime | None,
@@ -279,7 +279,7 @@ class CalendarConnector:
         events = data.get("events") if isinstance(data, dict) else data
         if not isinstance(events, list):
             raise CalendarConfigError("Fixture must be {events:[…]} or a list")
-        return _records_from_events(events, since=since)
+        return records_from_events(events, since=since)
 
     def _pull_ics(self, since: datetime | None) -> list[PullRecord]:
         if self._ics_path is not None:
@@ -291,7 +291,7 @@ class CalendarConnector:
             with urlopen(self._ics_url, timeout=self._timeout) as resp:  # noqa: S310
                 text = resp.read().decode("utf-8", errors="replace")
         events = _parse_ics_vevents(text)
-        return _records_from_events(events, since=since)
+        return records_from_events(events, since=since)
 
 
 def default_fixture_path() -> Path:

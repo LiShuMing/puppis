@@ -7,6 +7,7 @@ venv/
 *.sqlite
 .DS_Store
 dist/
+build/
 *.egg-info/
 .ruff_cache/
 .pytest_cache/

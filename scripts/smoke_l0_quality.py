@@ -6,6 +6,7 @@ Does not require live Notion / OSS credentials. Uses an isolated temp DB + raw r
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import os
 import shutil
@@ -106,11 +107,15 @@ def test_idempotent_fixture(tmp: Path) -> dict:
     assert raw_for_item >= 2, "changed content should add a new raw_objects hash row"
     assert r3.get("updated", 0) >= 1
 
-    # Local raw path stable (same item_id path) with new digest written.
-    # item_id may contain '/' — the store sanitizes it for the filename.
-    safe = first.item_id.replace("/", "_")
-    raw_files = list((raw / "sources" / "notion" / "raw").rglob(f"{safe}.json"))
-    assert len(raw_files) == 1, f"raw file should stay single path per item_id, got {raw_files}"
+    # Every recorded hash still resolves to its original, independently stored bytes.
+    conn = connect(db)
+    try:
+        rows = conn.execute("SELECT content_hash, uri FROM raw_objects WHERE item_id=?", (first.item_id,)).fetchall()
+        assert len({row["uri"] for row in rows}) == len(rows)
+        for row in rows:
+            assert hashlib.sha256(Path(row["uri"].removeprefix("file://")).read_bytes()).hexdigest() == row["content_hash"]
+    finally:
+        conn.close()
 
     return {
         "fixture_records": len(records),
@@ -259,10 +264,11 @@ def test_local_raw_idempotent_put(tmp: Path) -> dict:
     sha2, uri2 = store.write("notion", "item_smoke_1", payload)
     assert sha1 == sha2
     assert uri1 == uri2
-    # changed payload overwrites same path, new sha
+    # Changed payload is a new version; previous bytes remain available.
     sha3, uri3 = store.write("notion", "item_smoke_1", {**payload, "n": 2})
     assert sha3 != sha1
-    assert uri3 == uri1
+    assert uri3 != uri1
+    assert hashlib.sha256(Path(uri1.removeprefix("file://")).read_bytes()).hexdigest() == sha1
     return {"sha_stable_on_identical": True, "sha_changes_on_update": True}
 
 

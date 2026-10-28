@@ -22,8 +22,13 @@ class FakeOperator:
         return SimpleNamespace(user_metadata=self.objects[key][1]["user_metadata"])
 
     def write(self, key, data, **kwargs):
+        if kwargs.get("if_not_exists") and key in self.objects:
+            raise opendal.exceptions.ConditionNotMatch("exists")
         self.writes.append((key, data, kwargs))
         self.objects[key] = (data, kwargs)
+
+    def read(self, key):
+        return self.objects[key][0]
 
 
 @pytest.fixture(autouse=True)
@@ -39,19 +44,20 @@ def test_key_uri_and_idempotency():
     operator = FakeOperator()
     store = S3RawStore(bucket="bucket", prefix="/custom/", operator=operator)
     digest, uri = store.write("notion", "a/b", b'{"a":1}', when=WHEN)
-    key = "custom/sources/notion/raw/2026/03/a_b.json"
+    key = f"custom/sources/notion/raw/2026/03/{hashlib.sha256(b'a/b').hexdigest()}/{digest}.json"
     assert uri == f"s3://bucket/{key}"
     assert digest == hashlib.sha256(b'{"a":1}').hexdigest()
     assert operator.writes == [
-        (key, b'{"a":1}', {"content_type": "application/json", "user_metadata": {"sha256": digest}})
+        (key, b'{"a":1}', {"content_type": "application/json", "user_metadata": {"sha256": digest}, "if_not_exists": True})
     ]
     assert store.write("notion", "a/b", b'{"a":1}', when=WHEN) == (digest, uri)
     assert len(operator.writes) == 1
     changed_digest, changed_uri = store.write("notion", "a/b", b'{"a":2}', when=WHEN)
     assert changed_digest != digest
-    assert changed_uri == uri
+    assert changed_uri != uri
     assert len(operator.writes) == 2
     assert operator.writes[-1][2]["user_metadata"] == {"sha256": changed_digest}
+    assert operator.read(key) == b'{"a":1}'
 
 
 def test_error_key():
@@ -68,18 +74,27 @@ def test_error_key():
     }
 
 
-@pytest.mark.parametrize("error", [opendal.exceptions.NotFound, opendal.exceptions.PermissionDenied])
-def test_stat_miss(error):
-    operator = FakeOperator(missing=error)
-    S3RawStore(bucket="bucket", operator=operator).write("test", "id", {}, when=WHEN)
-    assert len(operator.writes) == 1
+def test_corrupt_object_is_not_overwritten():
+    operator = FakeOperator()
+    store = S3RawStore(bucket="bucket", operator=operator)
+    _, uri = store.write("test", "id", b"original", when=WHEN)
+    key = uri.removeprefix("s3://bucket/")
+    operator.objects[key] = (b"corrupted", {})
+    with pytest.raises(ValueError, match="verification"):
+        store.write("test", "id", b"original", when=WHEN)
+    assert operator.read(key) == b"corrupted"
 
 
-def test_other_stat_errors_propagate():
-    operator = FakeOperator(missing=RuntimeError)
-    with pytest.raises(RuntimeError):
+@pytest.mark.parametrize("error", [opendal.exceptions.PermissionDenied, opendal.exceptions.Unsupported])
+def test_failed_conditional_write_does_not_fall_back(error):
+    class FailingOperator(FakeOperator):
+        def write(self, key, data, **kwargs):
+            raise error("conditional write failed")
+
+    operator = FailingOperator()
+    with pytest.raises(error):
         S3RawStore(bucket="bucket", operator=operator).write("test", "id", {})
-    assert not operator.writes
+    assert not operator.objects
 
 
 def test_env_fallback(monkeypatch):

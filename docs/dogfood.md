@@ -45,7 +45,7 @@ PYTHONPATH=. .venv/bin/python scripts/ingest_notion.py --fixture --smoke-pack
 ```
 
 Uses `connectors/notion/demo_pull.json`. Raw lands under
-`$EVIDPLANE_RAW_ROOT/sources/notion/raw/yyyy/mm/<item_id>.json` (default `~/.evidplane`).
+`$EVIDPLANE_RAW_ROOT/sources/notion/raw/yyyy/mm/<sha256(item_id)>/<content_sha256>.json` (default `~/.evidplane`).
 Ingest is idempotent by `item_id` (re-pull → `inserted/updated/unchanged` stats, no duplicate
 rows). On a raw-write failure the error record goes to `sources/<connector>/errors/yyyy/mm/*.json`
 and the run fails loudly (`IngestError`), never silently.
@@ -91,7 +91,7 @@ After Notion ingest, in Cursor: **search** `source=notion`, **pack** `template=w
 | `search` | `q?`, `source?`, `since_days?`, `limit?` | FTS5 when `q` set |
 | `get` | `item_id` | Full text + `source_url` |
 | `pack` | `template=work`, `budget_tokens?`, `since_days?` | Cites + token estimate; hard cap: `token_estimate <= budget_tokens` |
-| `list_connectors` | — | Stub listing |
+| `list_connectors` | — | Actual ingested sources; empty on a fresh library |
 
 ## Boundaries
 

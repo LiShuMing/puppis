@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -38,7 +39,7 @@ def _parse_captured(value: str) -> datetime:
 
 
 def _safe_err_name(item_id: str) -> str:
-    return item_id.replace("/", "_").replace(" ", "_")[:80]
+    return hashlib.sha256(item_id.encode("utf-8")).hexdigest()
 
 
 def upsert_evidence(
@@ -77,7 +78,7 @@ def upsert_evidence(
                 """,
                 (sid, ev.connector_id, config_json, now_s),
             )
-            raw_id = f"raw_{ev.item_id}_{ev.content_sha256[:12]}"
+            raw_id = "raw_" + hashlib.sha256(f"{sid}\0{ev.item_id}\0{ev.content_sha256}".encode()).hexdigest()
             conn.execute(
                 """
                 INSERT OR IGNORE INTO raw_objects
@@ -97,15 +98,18 @@ def upsert_evidence(
             if not isinstance(prov, str):
                 prov = "platform"
             prev = conn.execute(
-                "SELECT body, source_url, title FROM items WHERE item_id = ?",
+                "SELECT body, source_url, title, source_id FROM items WHERE item_id = ?",
                 (ev.item_id,),
             ).fetchone()
+            if prev is not None and prev["source_id"] != sid:
+                raise ValueError("item_id already belongs to a different source")
             conn.execute(
                 """
                 INSERT INTO items
                   (item_id, source_id, connector_id, kind, title, body, source_url,
-                   captured_at, ingested_at, trust_level, provenance, tombstone)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1.0, ?, 0)
+                   captured_at, ingested_at, trust_level, provenance, tombstone,
+                   provenance_json, valid_from, valid_to, content_sha256, raw_uri)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
                 ON CONFLICT(item_id) DO UPDATE SET
                   source_id=excluded.source_id,
                   connector_id=excluded.connector_id,
@@ -116,6 +120,12 @@ def upsert_evidence(
                   captured_at=excluded.captured_at,
                   ingested_at=excluded.ingested_at,
                   provenance=excluded.provenance,
+                  trust_level=excluded.trust_level,
+                  provenance_json=excluded.provenance_json,
+                  valid_from=excluded.valid_from,
+                  valid_to=excluded.valid_to,
+                  content_sha256=excluded.content_sha256,
+                  raw_uri=excluded.raw_uri,
                   tombstone=0
                 """,
                 (
@@ -128,7 +138,13 @@ def upsert_evidence(
                     ev.url,
                     ev.captured_at,
                     now_s,
+                    0.5 if prov == "agent" and ev.provenance.get("human_reviewed") is not True else 1.0,
                     prov,
+                    json.dumps(ev.provenance, ensure_ascii=False),
+                    ev.valid_from,
+                    ev.valid_to,
+                    ev.content_sha256,
+                    ev.raw_uri,
                 ),
             )
             upserted += 1
