@@ -1,8 +1,10 @@
 # Evidplane
 
-Personal **Evidence lake + MCP** for coding agents: authorized sources → self-owned store → `search` / `get` / `pack(work)`.
+*`puppis` · repo codename*
 
-- Brand: **Evidplane** · Domain: `evidplane.com` (pending) · Repo codename: `puppis`
+**Evidplane** — personal evidence lake + MCP for coding agents：授权源 → 自有库 → `search` / `get` / `pack(work)`.
+
+- Brand: **Evidplane** · Domain: [evidplane.com](https://evidplane.com) · Repo codename: `puppis`
 - Spec: [docs/SPEC.md](docs/SPEC.md) · Dogfood: [docs/dogfood.md](docs/dogfood.md)
 - Modules: `connectors/` · `lake/` · `serve/` (explicit dependency boundaries)
 
@@ -84,4 +86,3 @@ Tools: `search`, `get`, `pack` (`template=work`), `list_connectors`.
 An empty database stays empty. Import explicitly marked demo data from the local
 workspace, or use `python -m lake.seed` with an isolated database for development.
 
-Private until dogfood.
